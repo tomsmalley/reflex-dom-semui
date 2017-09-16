@@ -19,7 +19,7 @@ module Reflex.Dom.SemanticUI.Dropdown where
 ------------------------------------------------------------------------------
 import           Control.Monad
 import           Control.Monad.Trans
-import           Control.Lens (makeLenses)
+import           Control.Lens ((^.), makeLenses)
 import           Data.Default
 import qualified Data.List as L
 import           Data.Map (Map)
@@ -29,184 +29,14 @@ import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified GHCJS.DOM.Element as DOM
+import           Language.Javascript.JSaddle
 import           Text.Read (readMaybe)
-#ifdef ghcjs_HOST_OS
-import GHCJS.DOM.Types
-       (liftJSM, JSString, JSVal, toJSString, fromJSString, pFromJSVal,
-        pToJSVal, toJSVal, JSM, fromJSValUnchecked)
-import GHCJS.Foreign.Callback (Callback, asyncCallback1, asyncCallback3)
-#else
-import GHCJS.DOM.Types
-       (liftJSM, JSString, toJSString, JSM, fromJSValUnchecked)
-import Language.Javascript.JSaddle.Object
-       (fun, js1, js2, jsg1, jss, obj)
-import Control.Lens.Operators ((^.))
-#endif
 import           Reflex
 --import           Reflex.Host.Class
 import           Reflex.Dom.Core hiding (fromJSString)
 ------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Common
 ------------------------------------------------------------------------------
-
-
-enumItemMap :: (Show a, Enum a) => a -> a -> [(a, Text)]
-enumItemMap from to = map (\a -> (a, T.pack $ show a)) [from..to]
-
-------------------------------------------------------------------------------
-activateSemUiDropdown :: Text -> JSM ()
-#ifdef ghcjs_HOST_OS
-activateSemUiDropdown = js_activateSemUiDropdown . toJSString
-
-foreign import javascript unsafe
-  "$($1).dropdown({fullTextSearch: true});"
-  js_activateSemUiDropdown :: JSString -> JSM ()
-#else
-activateSemUiDropdown name = do
-  o <- obj
-  o ^. jss ("fullTextSearch"::Text) True
-  void $ jsg1 ("$"::Text) name ^. js1 ("dropdown"::Text) o
-#endif
-
-#ifdef ghcjs_HOST_OS
-foreign import javascript unsafe
-  "$($1).dropdown({fullTextSearch: true});"
-  activateSemUiDropdownEl :: DOM.Element -> JSM ()
-#else
-activateSemUiDropdownEl :: DOM.Element -> JSM ()
-activateSemUiDropdownEl e = do
-  o <- obj
-  o ^. jss ("fullTextSearch"::Text) True
-  void $ jsg1 ("$"::Text) e ^. js1 ("dropdown"::Text) o
-#endif
-
-data DropdownMulti t a = DropdownMulti
-    { _dm_value :: Dynamic t a
-    }
-
-data DropdownMultiConfig a = DropdownMultiConfig
-    { _dmc_initialValue :: a
-    , _dmc_fullTextSearch :: Bool
-    , _dmc_elementId :: Text
-    }
-
-------------------------------------------------------------------------------
-activateSemUiDropdownMulti
-    :: (MonadWidget t m, Read a)
-    => DropdownMultiConfig a
-    -> m (DropdownMulti t a)
-activateSemUiDropdownMulti dmc = do
-    pb <- getPostBuild
-    let act cb = liftJSM $
-          activateSemUiDropdownMulti'
-            (toJSString $ _dmc_elementId dmc)
-            (liftIO . cb . read)
-            (_dmc_fullTextSearch dmc)
-    e <- performEventAsync (act <$ pb)
-    val <- holdDyn (_dmc_initialValue dmc) e
-    return $! DropdownMulti val
-
-#ifdef ghcjs_HOST_OS
-activateSemUiDropdownMulti' :: JSString -> (String -> JSM ()) -> Bool -> JSM ()
-activateSemUiDropdownMulti' name onChange full = do
-  jscb <- asyncCallback3 $ \_ t _ -> liftIO $
-    onChange $ fromJSString $ pFromJSVal t
-  js_activateSemUiDropdownMulti name jscb full
-
-foreign import javascript unsafe
-  "(function(){ $($1).dropdown({onChange: $2, fullTextSearch: $3}); })()"
-  js_activateSemUiDropdownMulti
-    :: JSString
-    -> Callback (JSVal -> JSVal -> JSVal -> JSM ())
-    -> Bool
-    -> JSM ()
-#else
-activateSemUiDropdownMulti' :: JSString -> (String -> JSM ()) -> Bool -> JSM ()
-activateSemUiDropdownMulti' name onChange full = do
-  o <- obj
-  o ^. jss ("onChange"::Text) (fun $ \_ _ [_, t, _] -> onChange =<< fromJSValUnchecked t)
-  o ^. jss ("fullTextSearch"::Text) full
-  void $ jsg1 ("$"::Text) name ^. js1 ("dropdown"::Text) o
-#endif
-
--- Multi-select sem-ui dropdown is not working properly yet.  Not sure how
--- to get the current value.
---
--- $('#dropdownId').dropdown('get value')
--- $('#dropdownId').onChange(value, text, $choice)
-
--- | Wrapper around the reflex-dom dropdown that calls the sem-ui dropdown
--- function after the element is built.
-semUiDropdownMulti
-    :: (MonadWidget t m, Show a)
-    => Text
-       -- ^ Element id.  Ideally this should be randomly generated instead
-       -- of passed in as an argument, but for now this approach is easier.
-    -> a
-       -- ^ Initial value
-    -> Dynamic t (Map a Text)
-    -> Map Text Text
-    -> m (Dynamic t Text)
-semUiDropdownMulti elId iv vals attrs = do
-    let f vs = semUiDropdownMulti' elId iv vs attrs
-    res <- dyn $ fmap f vals
-    join <$> holdDyn (constDyn $ tshow iv) res
-
--- | Wrapper around the reflex-dom dropdown that calls the sem-ui dropdown
--- function after the element is built.
-semUiDropdownMulti'
-    :: (MonadWidget t m, Show a)
-    => Text
-       -- ^ Element id.  Ideally this should be randomly generated instead
-       -- of passed in as an argument, but for now this approach is easier.
-    -> a
-       -- ^ Initial value
-    -> Map a Text
-    -> Map Text Text
-    -> m (Dynamic t Text)
-semUiDropdownMulti' elId iv vals attrs = do
-    d <- dropdown (tshow iv) (constDyn $ M.mapKeys tshow vals) $ def &
-      attributes .~ (constDyn $ attrs <> ("id" =: elId))
-    pb <- getPostBuild
-    performEvent_ (liftJSM (activateSemUiDropdown (T.cons '#' elId)) <$ pb)
-    return $ value d
-
--- | Wrapper around the reflex-dom dropdown that calls the sem-ui dropdown
--- function after the element is built.
-semUiDropdown
-    :: (MonadWidget t m, Ord a)
-    => Text
-       -- ^ Element id.  Ideally this should be randomly generated instead
-       -- of passed in as an argument, but for now this approach is easier.
-    -> a
-       -- ^ Initial value
-    -> Dynamic t (Map a Text)
-    -> Map Text Text
-    -> m (Dynamic t a)
-semUiDropdown elId iv vals attrs = do
-    let f vs = semUiDropdown' elId iv vs attrs
-    res <- dyn $ fmap f vals
-    join <$> holdDyn (constDyn iv) res
-
--- | Wrapper around the reflex-dom dropdown that calls the sem-ui dropdown
--- function after the element is built.
-semUiDropdown'
-    :: (MonadWidget t m, Ord a)
-    => Text
-       -- ^ Element id.  Ideally this should be randomly generated instead
-       -- of passed in as an argument, but for now this approach is easier.
-    -> a
-       -- ^ Initial value
-    -> Map a Text
-    -> Map Text Text
-    -> m (Dynamic t a)
-semUiDropdown' elId iv vals attrs = do
-    d <- dropdown iv (constDyn vals) $ def &
-      attributes .~ (constDyn $ attrs <> ("id" =: elId))
-    pb <- getPostBuild
-    performEvent_ (liftJSM (activateSemUiDropdown (T.cons '#' elId)) <$ pb)
-    return $ value d
-
 
 -- | Custom Dropdown item configuration
 data DropdownItemConfig m = DropdownItemConfig
@@ -233,91 +63,29 @@ dropdownClass :: [DropdownOptFlag] -> T.Text
 dropdownClass opts = T.unwords $ "ui" : (flags ++ ["dropdown"])
   where flags = map (T.toLower . T.drop 3 . tshow) $ L.sortOn fromEnum opts
 
-
-
--- | Dropdown with customizable menu items
-semUiDropdownWithItems
-  :: forall t m a.(MonadWidget t m, Ord a)
-  => Text
-     -- ^ Element id.  Ideally this should be randomly generated instead
-     -- of passed in as an argument, but for now this approach is easier.
-  -> [DropdownOptFlag]  -- TODO: DOFSearch eems broken
-  -> a -- ^ Initial value
-  -> Dynamic t (Map a (DropdownItemConfig m))
-     -- ^ Map of items' values and renderings
-  -> Map Text Text
-     -- ^ Dropown attributes
-  -> m (Dynamic t a)
-semUiDropdownWithItems elId opts iv vals attrs = do
-  (elDD, elChoice) <- elAttr' "div" ("id" =: elId <>
-                            "class" =: dropdownClass opts <> attrs) $ do
-    divClass "text" $ dynText (maybe "Menu" dropdownItemConfig_dataText .
-                               M.lookup iv <$> vals)
-    elAttr "i" ("class" =: "dropdown icon") blank
-
-    divClass "menu" $ do
-      sel <- listWithKey vals $ \k ddi -> do
-        let (eAttrs :: Dynamic t (Map T.Text T.Text)) =
-              ffor ddi $ \(DropdownItemConfig t _) ->
-                           ("class" =: "item" <> "data-text" =: t)
-            internal = dropdownItemConfig_internal <$> ddi :: Dynamic t (m ())
-        e <- elDynAttr' "div" eAttrs $ dyn internal
-        return (k <$ domEvent Click (fst e))
-      -- return $ (join . fmap fst . M.minView) <$> joinDynThroughMap sel
-      return $ switchPromptlyDyn $ leftmost . M.elems <$> sel
-
-  pb <- getPostBuild
-  performEvent_ (liftJSM (activateSemUiDropdownEl $ _element_raw elDD) <$ pb)
-  holdDyn iv (elChoice)
-
 ------------------------------------------------------------------------------
--- New implementation
+
 
 -- | Given a div element, tell semantic-ui to convert it to a dropdown with the
 -- given options. The callback function is called on change with the currently
 -- selected value.
 activateDropdown :: DOM.Element -> Maybe Int -> Bool -> Bool
                  -> (Text -> JSM ()) -> JSM ()
-#ifdef ghcjs_HOST_OS
-activateDropdown e mMaxSel useLabels fullText onChange = do
-  cb <- asyncCallback1 $ onChange . pFromJSVal
-  let maxSel = maybe (pToJSVal False) pToJSVal mMaxSel
-  js_activateDropdown e maxSel useLabels fullText cb
-foreign import javascript unsafe
-  "$($1).dropdown({ forceSelection : false \
-                  , maxSelections: $2 \
-                  , useLabels: $3 \
-                  , fullTextSearch: $4 \
-                  , onChange: function(value){ $5(value); } });"
-  js_activateDropdown :: DOM.Element -> JSVal -> Bool -> Bool
-                      -> Callback (JSVal -> JSM ()) -> JSM ()
-#else
 activateDropdown e maxSel useLabels fullText onChange = do
   o <- obj
-  o ^. jss ("forceSelection"::Text) False
-  o ^. jss ("maxSelections"::Text) maxSel
-  o ^. jss ("useLabels"::Text) useLabels
-  o ^. jss ("fullTextSearch"::Text) fullText
-  o ^. jss ("onChange"::Text) (fun $ \_ _ [t, _, _] ->
-    onChange =<< fromJSValUnchecked t)
-  void $ jsg1 ("$"::Text) e ^. js1 ("dropdown"::Text) o
-#endif
+  o <# ("forceSelection" :: Text) $ False
+  o <# ("maxSelections" :: Text) $ maxSel
+  o <# ("useLabels" :: Text) $ useLabels
+  o <# ("fullTextSearch" :: Text) $ fullText
+  o <# ("onChange" :: Text) $ fun $ \_ _ [t, _, _] ->
+    onChange =<< fromJSValUnchecked t
+  void $ jQuery e ^. js1 ("dropdown" :: Text) o
 
 -- | Given a dropdown element, set the value to the given list. For single
 -- dropdowns just provide a singleton list.
 dropdownSetExactly :: DOM.Element -> [Int] -> JSM ()
-#ifdef ghcjs_HOST_OS
-dropdownSetExactly e is = do
-  jsVal <- toJSVal $ map tshow is
-  js_dropdownSetExactly e jsVal
-
-foreign import javascript unsafe
-  "$($1).dropdown('set exactly', $2);"
-  js_dropdownSetExactly :: DOM.Element -> JSVal -> JSM ()
-#else
-dropdownSetExactly e is =
-  void $ jsg1 ("$"::Text) e ^. js2 ("dropdown"::Text) ("set exactly"::Text) is
-#endif
+dropdownSetExactly e is
+  = void $ jQuery e ^. js2 ("dropdown" :: Text) ("set exactly" :: Text) is
 
 ------------------------------------------------------------------------------
 

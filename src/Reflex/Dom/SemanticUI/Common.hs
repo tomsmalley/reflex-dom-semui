@@ -15,10 +15,32 @@
 module Reflex.Dom.SemanticUI.Common where
 
 ------------------------------------------------------------------------------
+import           Control.Lens ((^.))
+import           Control.Monad (void)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Language.Javascript.JSaddle
 import           Reflex.Dom.Core
 ------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+-- JSaddle helpers
+
+-- | Javascript console.log
+consoleLog :: ToJSVal a => a -> JSM ()
+consoleLog a = do
+  console <- jsg ("console" :: Text)
+  void $ console ^. js1 ("log" :: Text) a
+
+-- | Catch any JSExceptions and log them to the console. Useful for debugging
+-- ghc implementations, especially wth jsaddle-warp.
+catchJS :: JSM () -> JSM ()
+catchJS action = catch action handle
+  where handle (JSException e) = consoleLog e
+
+-- | The jQuery function, often used by the alias $(..) in javascript.
+jQuery :: ToJSVal a => a -> JSM JSVal
+jQuery = jsg1 ("jQuery" :: Text)
 
 ------------------------------------------------------------------------------
 -- | Temporary...will be moved out of here eventually.

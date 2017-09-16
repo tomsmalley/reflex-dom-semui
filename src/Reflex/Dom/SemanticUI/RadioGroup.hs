@@ -9,8 +9,9 @@
 module Reflex.Dom.SemanticUI.RadioGroup where
 
 ------------------------------------------------------------------------------
+import           Control.Monad (void)
 import           Control.Monad.Trans
-import           Control.Lens (makeLenses)
+import           Control.Lens (makeLenses, (^.))
 import           Data.Default
 import           Data.Functor (($>))
 import qualified Data.List as L
@@ -21,17 +22,7 @@ import           Data.Monoid ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified GHCJS.DOM.Element as DOM
-#ifdef ghcjs_HOST_OS
-import Control.Monad ((<=<))
-import GHCJS.DOM.Types (liftJSM, JSVal, pFromJSVal, pToJSVal, toJSVal, JSM)
-import GHCJS.Foreign.Callback (Callback, asyncCallback1)
-import Text.Read (readMaybe)
-#else
-import Control.Monad (void)
-import GHCJS.DOM.Types (liftJSM, JSM, fromJSValUnchecked)
-import Language.Javascript.JSaddle.Object (fun, js0, js1, js2, jsg1)
-import Control.Lens.Operators ((^.))
-#endif
+import           Language.Javascript.JSaddle
 import           Reflex
 import           Reflex.Dom.Core hiding (fromJSString)
 ------------------------------------------------------------------------------
@@ -40,66 +31,34 @@ import           Reflex.Dom.SemanticUI.Common
 ------------------------------------------------------------------------------
 
 
--- | Activate a dropdown element with Semantic UI. No callbacks by semantic ui
+-- | Activate a radio element with Semantic UI. No callbacks by semantic ui
 -- because they don't notify when a radio is automatically de-selected, so
 -- instead we manually put on change listeners to the individual radio items.
 activateRadio :: DOM.Element -> JSM ()
-#ifdef ghcjs_HOST_OS
-activateRadio = js_activateRadio
-foreign import javascript unsafe
-  "$($1).checkbox();"
-  js_activateRadio :: DOM.Element -> JSM ()
-#else
-activateRadio e =
-  void $ jsg1 ("$"::Text) e ^. js0 ("dropdown"::Text)
-#endif
+activateRadio e = void $ jQuery e ^. js0 ("checkbox" :: Text)
 
 -- | Given a list of radio checkboxes, setup onChange callbacks
 setRadioCallbacks :: [DOM.Element] -> (Maybe Int -> JSM ()) -> JSM ()
-#ifdef ghcjs_HOST_OS
-setRadioCallbacks es f = do
-  cb <- asyncCallback1 $ f . (\x -> readMaybe =<< pFromJSVal x)
-  els <- toJSVal es
-  js_setRadioCallbacks els cb
-foreign import javascript unsafe
-  "$($1).on('change', function() { $2($($1).filter(':checked').val()); });"
-  js_setRadioCallbacks :: JSVal -> Callback (JSVal -> JSM ()) -> JSM ()
-#else
 setRadioCallbacks es onChange = do
-  checked <- jsg1 ("$"::Text) es
-          ^. js1 ("filter"::Text) (":checked"::Text)
-          ^. js0 ("val"::Text)
-  let cb = fun $ \_ _ [] -> onChange =<< fromJSValUnchecked checked
-  void $ jsg1 ("$"::Text) es ^. js2 ("on"::Text) ("change"::Text) cb
-#endif
+  let checked = jQuery es
+        ^. js1 ("filter" :: Text) (":checked" :: Text)
+        ^. js0 ("val" :: Text)
+  let callback = fun $ \_ _ _ -> onChange =<< fromJSValUnchecked =<< checked
+  void $ jQuery es ^. js2 ("on" :: Text) ("change" :: Text) callback
 
 -- | Set the current value of a radio group.
 setRadioGroup :: [DOM.Element] -> Maybe Int -> JSM (Maybe Int)
-#ifdef ghcjs_HOST_OS
-setRadioGroup es mval = do
-  els <- toJSVal es
-  case pToJSVal <$> mval of
-    Nothing -> js_clearRadioGroup els *> return Nothing
-    Just val -> (readMaybe <=< pFromJSVal) <$> js_setRadioGroup els val
-foreign import javascript unsafe
-  "$($1).prop('checked', false);"
-  js_clearRadioGroup :: JSVal -> JSM ()
-foreign import javascript unsafe
-  "$($1).filter('[value=' + $2 + ']').prop('checked', true);\
-   $r = $($1).filter(':checked').val();"
-  js_setRadioGroup :: JSVal -> JSVal -> JSM JSVal
-#else
-setRadioGroup es Nothing =
-  Nothing <$ jsg1 ("$"::Text) es ^. js2 ("prop"::Text) ("checked"::Text) False
+setRadioGroup es Nothing
+  = Nothing <$ jQuery es ^. js2 ("prop" :: Text) ("checked" :: Text) False
 setRadioGroup es (Just val) = do
-  jsg1 ("$"::Text) es
-    ^. js1 ("filter"::Text) ("[value=" <> tshow val <> "]"::Text)
-    ^. js2 ("prop"::Text) ("checked"::Text) True
-  selected <- jsg1 ("$"::Text) es
-    ^. js1 ("filter"::Text) (":checked"::Text)
-    ^. js0 ("val"::Text)
+  jQuery es
+    ^. js1 ("filter" :: Text) ("[value=" <> tshow val <> "]")
+    ^. js2 ("prop" :: Text) ("checked" :: Text) True
+  selected <- jQuery es
+    ^. js1 ("filter" :: Text) (":checked" :: Text)
+    ^. js0 ("val" :: Text)
+  syncPoint -- needed for the initial set event to fire
   fromJSValUnchecked selected
-#endif
 
 ------------------------------------------------------------------------------
 
@@ -207,7 +166,7 @@ putRadioItem name classes i (RadioItemConfig label attrs' divAttrs') = do
     (inputEl, _) <- elAttr' "input" attrs blank
     el "label" $ dyn label
     return inputEl
-  -- Setup checkbox with semantic ui
+  -- Setup radio checkbox element with semantic ui
   schedulePostBuild $ liftJSM $ activateRadio $ _element_raw cbEl
 
   return $ _element_raw inputEl
