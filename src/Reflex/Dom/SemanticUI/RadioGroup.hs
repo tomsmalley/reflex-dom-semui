@@ -1,8 +1,5 @@
-{-# LANGUAGE CPP                      #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE JavaScriptFFI            #-}
 {-# LANGUAGE OverloadedStrings        #-}
-{-# LANGUAGE RankNTypes               #-}
+{-# LANGUAGE Rank2Types               #-}
 {-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE TypeFamilies             #-}
 
@@ -13,7 +10,6 @@ import           Control.Monad (void)
 import           Control.Monad.Trans
 import           Control.Lens (makeLenses, (^.))
 import           Data.Default
-import           Data.Functor (($>))
 import qualified Data.List as L
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -50,10 +46,11 @@ setRadioCallbacks es onChange = do
 setRadioGroup :: [DOM.Element] -> Maybe Int -> JSM (Maybe Int)
 setRadioGroup es Nothing
   = Nothing <$ jQuery es ^. js2 ("prop" :: Text) ("checked" :: Text) False
-setRadioGroup es (Just val) = do
-  jQuery es
-    ^. js1 ("filter" :: Text) ("[value=" <> tshow val <> "]")
+setRadioGroup es (Just v) = do
+  void $ jQuery es
+    ^. js1 ("filter" :: Text) ("[value=" <> tshow v <> "]")
     ^. js2 ("prop" :: Text) ("checked" :: Text) True
+  -- Try to prevent state being out of sync by returning which is selected
   selected <- jQuery es
     ^. js1 ("filter" :: Text) (":checked" :: Text)
     ^. js0 ("val" :: Text)
@@ -120,32 +117,32 @@ radioGroup name items config = do
 
   -- Insert all of the items, collecting the raw elements and wrapping them with
   -- the given wrapper function
-  inputEls <- traverse wrap . imap (putRadioItem name classes) $ map snd items
+  inputEls <- traverse wrapper . imap (putRadioItem name classes)
+    $ map snd items
 
-  -- Helper to lookup the index of an items type
+  -- Helper to lookup the index of an item
   let getIndex v = L.findIndex ((==) v . fst) items
+      setRadio = liftJSM . setRadioGroup inputEls . (getIndex =<<)
 
-  -- Event performed when user fires a set value event. Looks up the value
-  -- index, and sets the value in DOM through js.
-  onSetEvent <- performEvent $ liftJSM . setRadioGroup inputEls . (>>= getIndex)
-                            <$> _radioGroupConfig_setValue config
+  -- Event performed when user fires a set value event
+  onSetEvent <- performEvent $ setRadio <$> _radioGroupConfig_setValue config
 
   -- Set initial value
   pb <- getPostBuild
-  setInitialEvent <- performEvent $ pb $> liftJSM
-    (setRadioGroup inputEls $ getIndex
-      =<< _radioGroupConfig_initialValue config)
+  setInitialEvent <- performEvent $ setRadio initialValue <$ pb
 
   -- On change callbacks
   (onChangeEvent, onChangeCallback) <- newTriggerEvent
-  schedulePostBuild $ liftJSM $ setRadioCallbacks inputEls $
-    liftIO . onChangeCallback
+  let setupCallbacks = liftJSM . setRadioCallbacks inputEls
+                     $ liftIO . onChangeCallback
+  performEvent_ $ setupCallbacks <$ pb
 
   index <- holdDyn Nothing $ leftmost [onChangeEvent, onSetEvent, setInitialEvent]
   return $ (\i -> fmap fst $ (items !?) =<< i) <$> index
 
   where
-    wrap = _radioGroupConfig_wrapper config
+    initialValue = _radioGroupConfig_initialValue config
+    wrapper = _radioGroupConfig_wrapper config
     cbType = _radioGroupConfig_type config
     hasRadio = if isToggleOrSlider cbType then [] else ["radio"]
     classes = T.unlines $ "ui checkbox" : hasRadio ++ map uiText cbType
@@ -162,12 +159,16 @@ putRadioItem
   -> RadioItemConfig t m  -- ^ Item configuration
   -> m DOM.Element
 putRadioItem name classes i (RadioItemConfig label attrs' divAttrs') = do
+
+  -- Make the radio item
   (cbEl, inputEl) <- elAttr' "div" divAttrs $ do
     (inputEl, _) <- elAttr' "input" attrs blank
-    el "label" $ dyn label
+    void $ el "label" $ dyn label
     return inputEl
+
   -- Setup radio checkbox element with semantic ui
-  schedulePostBuild $ liftJSM $ activateRadio $ _element_raw cbEl
+  pb <- getPostBuild
+  performEvent_ $ (liftJSM $ activateRadio $ _element_raw cbEl) <$ pb
 
   return $ _element_raw inputEl
 

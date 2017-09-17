@@ -36,15 +36,15 @@ library
     Reflex.Dom.SemanticUI.RadioGroup
 
   build-depends:
-      base       >= 4.8 && < 4.10
+      base            >= 4.8 && < 4.10
     , containers
     , data-default
-    , file-embed >= 0.0.10 && < 0.1
+    , file-embed      >= 0.0.10 && < 0.1
     , ghcjs-dom
-    , jsaddle >= 0.8.0.0 && < 0.10
+    , jsaddle         >= 0.8.0.0 && < 0.10
     , lens
     , mtl
-    , reflex     >= 0.5 && < 0.6
+    , reflex          >= 0.5 && < 0.6
     , reflex-dom-core >= 0.4 && < 0.5
     , text
 
@@ -58,26 +58,27 @@ library
 
 executable example
   main-is: Main.hs
-  hs-source-dirs: example
+  hs-source-dirs: example, src
   other-modules: Example, Example.CountryEnum, Example.StateEnum
   default-language: Haskell2010
   build-depends:
-      base
+      base            >= 4.8 && < 4.10
     , containers
+    , data-default
+    , file-embed      >= 0.0.10 && < 0.1
     , ghcjs-dom
+    , jsaddle         >= 0.8.0.0 && < 0.10
     , lens
     , mtl
-    , reflex            >= 0.5 && < 0.6
-    , reflex-dom-core   >= 0.4 && < 0.5
-    , reflex-dom-semui
+    , reflex          >= 0.5 && < 0.6
+    , reflex-dom-core >= 0.4 && < 0.5
     , text
-    , jsaddle           >= 0.8.0.0 && < 0.10
   if impl(ghc)
     build-depends:
         jsaddle-warp
       , warp
-      , websockets
       , wai-app-static
+      , websockets
   ghc-prof-options: -fprof-auto
   ghc-options: -threaded -Wall -fwarn-tabs -funbox-strict-fields -O2
 

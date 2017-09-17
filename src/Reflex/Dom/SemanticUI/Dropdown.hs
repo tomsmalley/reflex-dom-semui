@@ -1,17 +1,7 @@
-{-# LANGUAGE ConstraintKinds          #-}
-{-# LANGUAGE CPP                      #-}
 {-# LANGUAGE DeriveFunctor            #-}
-{-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE FlexibleInstances        #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE JavaScriptFFI            #-}
-{-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE OverloadedStrings        #-}
-{-# LANGUAGE RecordWildCards          #-}
-{-# LANGUAGE RecursiveDo              #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeFamilies             #-}
-{-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE TemplateHaskell          #-}
 
 module Reflex.Dom.SemanticUI.Dropdown where
@@ -23,7 +13,6 @@ import           Control.Lens ((^.), makeLenses)
 import           Data.Default
 import qualified Data.List as L
 import           Data.Map (Map)
-import qualified Data.Map as M
 import           Data.Maybe (catMaybes, maybeToList)
 import           Data.Monoid
 import           Data.Text (Text)
@@ -147,20 +136,22 @@ uiDropdown
   -> m (Dynamic t (Maybe a))
 uiDropdown items options config = do
   (divEl, evt) <- dropdownInternal items options False (void config)
-  let getIndex v = L.findIndex ((==) v . fst) items
-      setDropdown = dropdownSetExactly (_element_raw divEl)
+
+  let setDropdown = liftJSM . dropdownSetExactly (_element_raw divEl)
+                  . maybeToList . (getIndex =<<)
 
   -- setValue events
-  performEvent_ $ liftJSM . setDropdown . maybeToList . (>>= getIndex)
-               <$> _dropdownConf_setValue config
+  performEvent_ $ setDropdown <$> _dropdownConf_setValue config
 
   -- Set initial value
   pb <- getPostBuild
-  performEvent $
-    liftJSM (setDropdown $ maybeToList $ getIndex
-      =<< _dropdownConf_initialValue config) <$ pb
+  performEvent_ $ setDropdown initialValue <$ pb
 
   holdDyn Nothing $ indexToItem items <$> evt
+
+  where
+    initialValue = _dropdownConf_initialValue config
+    getIndex v = L.findIndex ((==) v . fst) items
 
 -- | Semantic-UI dropdown with multiple static items
 uiDropdownMulti
@@ -172,20 +163,21 @@ uiDropdownMulti
 uiDropdownMulti items options config = do
   (divEl, evt) <- dropdownInternal items options True (void config)
 
-  let getIndices vs = L.findIndices ((`elem` vs) . fst) items
-      setDropdown = dropdownSetExactly (_element_raw divEl)
+  let setDropdown = liftJSM . dropdownSetExactly (_element_raw divEl)
+                  . getIndices
 
   -- setValue events
-  performEvent_ $ liftJSM . setDropdown . getIndices
-               <$> _dropdownConf_setValue config
+  performEvent_ $ setDropdown <$> _dropdownConf_setValue config
 
   -- Set initial value
   pb <- getPostBuild
-  performEvent $
-    liftJSM (setDropdown . getIndices $
-      _dropdownConf_initialValue config) <$ pb
+  performEvent_ $ setDropdown initialValue <$ pb
 
   holdDyn [] $ catMaybes . map (indexToItem items) . T.splitOn "," <$> evt
+
+  where
+    initialValue = _dropdownConf_initialValue config
+    getIndices vs = L.findIndices ((`elem` vs) . fst) items
 
 -- | Internal function with shared behaviour
 dropdownInternal
@@ -211,9 +203,10 @@ dropdownInternal items options isMulti config = do
   (onChangeEvent, onChangeCallback) <- newTriggerEvent
 
   -- Activate the dropdown after element is built
-  schedulePostBuild $ liftJSM $
-    activateDropdown (_element_raw divEl) maxSel useLabels fullText $
-      liftIO . onChangeCallback
+  let activate = activateDropdown (_element_raw divEl) maxSel useLabels fullText
+               $ liftIO . onChangeCallback
+  pb <- getPostBuild
+  performEvent_ $ liftJSM activate <$ pb
 
   return (divEl, onChangeEvent)
 
