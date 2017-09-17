@@ -15,7 +15,6 @@
 module Reflex.Dom.SemanticUI.Modal where
 
 ------------------------------------------------------------------------------
-import           Control.Monad.Trans
 import           Data.Text (Text)
 import qualified GHCJS.DOM.Types as DOM
 #ifndef ghcjs_HOST_OS
@@ -76,7 +75,7 @@ modalBehaviorString beh =
 uiModal :: MonadWidget t m => Event t ModalBehavior -> m a -> m a
 uiModal beh children = do
     (e,res) <- elAttr' "div" ("class" =: "ui modal") children
-    performEvent (DOM.liftJSM . uiTriggerModalAction (_element_raw e) <$> beh)
+    performEvent_ (DOM.liftJSM . uiTriggerModalAction (_element_raw e) <$> beh)
     return res
 
 ------------------------------------------------------------------------------

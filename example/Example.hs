@@ -8,14 +8,14 @@ module Example (example) where
 
 import Control.Lens
 import Control.Monad (void)
-import Data.Map (Map, fromList)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
-import Reflex.Dom.Core
 import Reflex.Dom.SemanticUI
 import Language.Javascript.JSaddle hiding ((!!))
+
+import Debug.Trace
 
 import Example.StateEnum
 import Example.CountryEnum
@@ -85,35 +85,73 @@ checkboxes = do
       divClass "field" $ do
         el "label" $ text "Checkboxes with labels"
         divClass "ui compact segment" $ do
-          c1 <- uiCheckbox (text "Normal checkbox") $
-            def & setValue .~ (False <$ resetEvent)
-          divClass "ui left pointing label" $ display $ value c1
+          cb <- checkbox (text "Normal checkbox") $
+            def & setValue .~ (Unchecked <$ resetEvent)
+          divClass "ui left pointing label" $ display $ view value cb
         divClass "ui compact segment" $ do
-          c2 <- uiCheckbox (text "Toggle checkbox (checked by default)") $
-            def & checkboxConf_type .~ [CbToggle]
-                & setValue .~ (True <$ resetEvent)
-                & checkboxConf_initialValue .~ True
-          divClass "ui left pointing label" $ display $ value c2
+          cb <- checkbox (text "Toggle checkbox (checked by default)") $
+            def & types .~ [CbToggle]
+                & setValue .~ (Checked <$ resetEvent)
+                & initialValue .~ Checked
+          divClass "ui left pointing label" $ display $ view value cb
         divClass "ui compact segment" $ do
-          c3 <- uiCheckbox (text "Slider checkbox") $
-            def & checkboxConf_type .~ [CbSlider]
-                & setValue .~ (False <$ resetEvent)
-          divClass "ui left pointing label" $ display $ value c3
+          cb <- checkbox (text "Slider checkbox") $
+            def & types .~ [CbSlider]
+                & setValue .~ (Unchecked <$ resetEvent)
+          divClass "ui left pointing label" $ display $ view value cb
 
-      void $ divClass "field" $ do
         el "label" $ text "Fitted checkboxes"
+        void $ divClass "ui left floated compact segment" $ do
+          checkbox blank $
+            def & types .~ [CbFitted]
+                & setValue .~ (Unchecked <$ resetEvent)
+        void $ divClass "ui left floated compact segment" $ do
+          checkbox blank $
+            def & types .~ [CbFitted, CbToggle]
+                & setValue .~ (Unchecked <$ resetEvent)
+        void $ divClass "ui left floated compact segment" $ do
+          checkbox blank $
+            def & types .~ [CbFitted, CbSlider]
+                & setValue .~ (Unchecked <$ resetEvent)
+
+      elAttr "div" ("style" =: "clear: both;") blank
+
+
+      divClass "field" $ do
+        let buttonType = small . compact <$> def
+        el "label" $ do
+          text "Checkbox states"
+        enable <- uiButton (custom "left attached" <$> buttonType) $ text "Enable"
+        disable <- uiButton (custom "right attached" <$> buttonType) $ text "Disable"
+        let enableEvent = leftmost [Enabled <$ enable, Disabled <$ disable]
+
         divClass "ui compact segment" $ do
-          uiCheckbox blank $
-            def & checkboxConf_type .~ [CbFitted]
-                & setValue .~ (False <$ resetEvent)
+          cb <- checkbox (text "Initially disabled") $
+            def & setValue .~ (Unchecked <$ resetEvent)
+                & initialEnabled .~ Disabled
+                & setEnabled .~ leftmost [enableEvent, Disabled <$ resetEvent]
+          divClass "ui left pointing label" $ display $ zipDynWith (,) (view value cb) (view enabled cb)
         divClass "ui compact segment" $ do
-          uiCheckbox blank $
-            def & checkboxConf_type .~ [CbFitted, CbToggle]
-                & setValue .~ (False <$ resetEvent)
+          cb <- checkbox (text "Initially disabled (checked by default)") $
+            def & types .~ [CbToggle]
+                & setValue .~ (Checked <$ resetEvent)
+                & initialEnabled .~ Disabled
+                & initialValue .~ Checked
+                & setEnabled .~ leftmost [enableEvent, Disabled <$ resetEvent]
+          divClass "ui left pointing label" $ display $ zipDynWith (,) (view value cb) (view enabled cb)
+
+        indeterminateButton <- uiButton (custom "left attached" <$> buttonType) $ text "Indeterminate"
+        determinateButton <- uiButton (custom "right attached" <$> buttonType) $ text "Determinate"
+        let indeterminateEvent = leftmost [Indeterminate <$ indeterminateButton, Determinate <$ determinateButton]
         divClass "ui compact segment" $ do
-          uiCheckbox blank $
-            def & checkboxConf_type .~ [CbFitted, CbSlider]
-                & setValue .~ (False <$ resetEvent)
+          cb <- checkbox (text "Indeterminate") $
+            def & types .~ []
+                & setValue .~ (Checked <$ resetEvent)
+                & divAttributes .~ "class" =: "master"
+                & initialIndeterminate .~ Indeterminate
+                & initialValue .~ Checked
+                & setIndeterminate .~ leftmost [indeterminateEvent, Indeterminate <$ resetEvent]
+          divClass "ui left pointing label" $ display $ zipDynWith (,) (view value cb) (view indeterminate cb)
 
 dropdowns :: MonadWidget t m => m ()
 dropdowns = do
@@ -139,16 +177,16 @@ dropdowns = do
               text "Single value"
               divClass "ui left pointing label" $ display card
             card <- uiDropdown cards [DOFSelection] $
-              def & dropdownConf_placeholder .~ "Card Type"
+              def & placeholder .~ "Card Type"
                   & setValue .~ (Just Visa <$ resetEvent)
-                  & dropdownConf_initialValue ?~ Visa
+                  & initialValue ?~ Visa
         return ()
       divClass "field" $ do
         rec el "label" $ do
               text "Single value, search"
               divClass "ui left pointing label" $ display contact
             contact <- uiDropdown contacts [DOFSearch, DOFSelection] $
-              def & dropdownConf_placeholder .~ "Saved Contacts"
+              def & placeholder .~ "Saved Contacts"
                   & setValue .~ (Nothing <$ resetEvent)
         return ()
 
@@ -157,7 +195,7 @@ dropdowns = do
             text "Multi value"
             divClass "ui left pointing label" $ display card
           card <- uiDropdownMulti cards [DOFSelection] $
-            def & dropdownConf_placeholder .~ "Card Type"
+            def & placeholder .~ "Card Type"
                 & setValue .~ (mempty <$ resetEvent)
       return ()
 
@@ -166,10 +204,10 @@ dropdowns = do
             text "Multi value, full-text search"
             divClass "ui left pointing label" $ display contact
           contact <- uiDropdownMulti contacts [DOFSearch, DOFSelection] $
-            def & dropdownConf_placeholder .~ "Saved Contacts"
+            def & placeholder .~ "Saved Contacts"
                 & setValue .~ ([Matt, Elliot] <$ resetEvent)
-                & dropdownConf_initialValue .~ [Matt, Elliot]
-                & dropdownConf_fullTextSearch .~ True
+                & initialValue .~ [Matt, Elliot]
+                & fullTextSearch .~ True
       return ()
 
     divClass "two fields" $ do
@@ -178,18 +216,18 @@ dropdowns = do
               text "Multi value, limited"
               divClass "ui left pointing label" $ display state
             state <- uiDropdownMulti states [DOFSelection] $
-              def & dropdownConf_placeholder .~ "States"
+              def & placeholder .~ "States"
                   & setValue .~ (mempty <$ resetEvent)
-                  & dropdownConf_maxSelections ?~ 3
+                  & maxSelections ?~ 3
         return ()
       divClass "field" $ do
         rec el "label" $ do
               text "Multi value, search, hidden labels"
               divClass "ui left pointing label" $ display country
             country <- uiDropdownMulti countries [DOFSearch, DOFSelection] $
-              def & dropdownConf_placeholder .~ "Country"
+              def & placeholder .~ "Country"
                   & setValue .~ (mempty <$ resetEvent)
-                  & dropdownConf_useLabels .~ False
+                  & useLabels .~ False
         return ()
 
 radioGroups :: forall t m. MonadWidget t m => m ()
@@ -201,9 +239,9 @@ radioGroups = do
       uiButton (rightFloated . mini . compact . basic <$> def) $ text "Reset"
 
   divClass "ui bottom attached segment form" $ do
-    let makeFreq x = (x, def & setValue .~ constDyn (text $ showFreq x))
+    let makeFreq x = RadioItem x (text $ showFreq x) def
         freqencies = map makeFreq [minBound..maxBound]
-        makeThru x = (x, def & setValue .~ constDyn (text $ showThroughput x))
+        makeThru x = RadioItem x (text $ showThroughput x) def
         throughputs = map makeThru [Metered 20, Metered 10, Metered 5, Unmetered]
 
     divClass "field" $ do
@@ -221,9 +259,9 @@ radioGroups = do
             divClass "ui left pointing label" $ display throughput
           throughput <- divClass "grouped fields" $ do
             radioGroup "throughput" throughputs $
-              def & radioGroupConfig_initialValue ?~ Unmetered
+              def & initialValue ?~ Unmetered
                   & setValue .~ (Just Unmetered <$ resetEvent)
-                  & radioGroupConfig_type .~ [CbSlider]
+                  & types .~ [CbSlider]
       return ()
 
 example :: JSM ()

@@ -4,12 +4,21 @@
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE TemplateHaskell          #-}
 
-module Reflex.Dom.SemanticUI.Dropdown where
+module Reflex.Dom.SemanticUI.Dropdown
+  (
+    Dropdown (..)
+  , uiDropdown
+  , uiDropdownMulti
+  , DropdownConfig (..)
+  , DropdownItemConfig (..)
+  , DropdownOptFlag (..)
+
+  ) where
 
 ------------------------------------------------------------------------------
 import           Control.Monad
 import           Control.Monad.Trans
-import           Control.Lens ((^.), makeLenses)
+import           Control.Lens ((^.))
 import           Data.Default
 import qualified Data.List as L
 import           Data.Map (Map)
@@ -22,16 +31,17 @@ import           Language.Javascript.JSaddle
 import           Text.Read (readMaybe)
 import           Reflex
 --import           Reflex.Host.Class
-import           Reflex.Dom.Core hiding (fromJSString)
+import           Reflex.Dom.Core hiding
+  ( DropdownConfig (..) )
 ------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Common
 ------------------------------------------------------------------------------
 
 -- | Custom Dropdown item configuration
 data DropdownItemConfig m = DropdownItemConfig
-  { dropdownItemConfig_dataText :: T.Text
+  { dataText :: T.Text
     -- ^ dataText (shown for the selected item)
-  , dropdownItemConfig_internal :: m ()
+  , internal :: m ()
     -- ^ Procedure for drawing the DOM contents of the menu item
     --   (we produce the menu item div for you, so it's enough to
     --    use something simple here, e.g. `text "Friends"`
@@ -79,47 +89,37 @@ dropdownSetExactly e is
 ------------------------------------------------------------------------------
 
 -- | Config for new semantic dropdowns
-data DropdownConf t a = DropdownConf
-  { _dropdownConf_initialValue :: a
-  , _dropdownConf_setValue :: Event t a
-  , _dropdownConf_attributes :: Map Text Text
-  , _dropdownConf_placeholder :: Text
-  , _dropdownConf_maxSelections :: Maybe Int
-  , _dropdownConf_useLabels :: Bool
-  , _dropdownConf_fullTextSearch :: Bool
+data DropdownConfig t a = DropdownConfig
+  { _initialValue :: a
+  , _setValue :: Event t a
+  , _attributes :: Map Text Text
+  , _placeholder :: Text
+  , _maxSelections :: Maybe Int
+  , _useLabels :: Bool
+  , _fullTextSearch :: Bool
   } deriving Functor
 
-$(makeLenses ''DropdownConf)
-
-instance (Reflex t) => Default (DropdownConf t (Maybe a)) where
-  def = DropdownConf
-    { _dropdownConf_initialValue = Nothing
-    , _dropdownConf_setValue = never
-    , _dropdownConf_attributes = mempty
-    , _dropdownConf_placeholder = mempty
-    , _dropdownConf_maxSelections = Nothing
-    , _dropdownConf_useLabels = True
-    , _dropdownConf_fullTextSearch = False
+instance (Reflex t) => Default (DropdownConfig t (Maybe a)) where
+  def = DropdownConfig
+    { _initialValue = Nothing
+    , _setValue = never
+    , _attributes = mempty
+    , _placeholder = mempty
+    , _maxSelections = Nothing
+    , _useLabels = True
+    , _fullTextSearch = False
     }
 
-instance (Reflex t) => Default (DropdownConf t [a]) where
-  def = DropdownConf
-    { _dropdownConf_initialValue = mempty
-    , _dropdownConf_setValue = never
-    , _dropdownConf_attributes = mempty
-    , _dropdownConf_placeholder = mempty
-    , _dropdownConf_maxSelections = Nothing
-    , _dropdownConf_useLabels = True
-    , _dropdownConf_fullTextSearch = False
+instance (Reflex t) => Default (DropdownConfig t [a]) where
+  def = DropdownConfig
+    { _initialValue = mempty
+    , _setValue = never
+    , _attributes = mempty
+    , _placeholder = mempty
+    , _maxSelections = Nothing
+    , _useLabels = True
+    , _fullTextSearch = False
     }
-
-instance HasAttributes (DropdownConf t a) where
-  type Attrs (DropdownConf t a) = Map Text Text
-  attributes = dropdownConf_attributes
-
-instance HasSetValue (DropdownConf t a) where
-  type SetValue (DropdownConf t a) = Event t a
-  setValue = dropdownConf_setValue
 
 -- | Helper function
 indexToItem :: [(a, DropdownItemConfig m)] -> Text -> Maybe a
@@ -132,7 +132,7 @@ uiDropdown
   :: (MonadWidget t m, Eq a)
   => [(a, DropdownItemConfig m)]  -- ^ Items
   -> [DropdownOptFlag]            -- ^ Options
-  -> DropdownConf t (Maybe a)     -- ^ Dropdown config
+  -> DropdownConfig t (Maybe a)     -- ^ Dropdown config
   -> m (Dynamic t (Maybe a))
 uiDropdown items options config = do
   (divEl, evt) <- dropdownInternal items options False (void config)
@@ -141,7 +141,7 @@ uiDropdown items options config = do
                   . maybeToList . (getIndex =<<)
 
   -- setValue events
-  performEvent_ $ setDropdown <$> _dropdownConf_setValue config
+  performEvent_ $ setDropdown <$> _setValue config
 
   -- Set initial value
   pb <- getPostBuild
@@ -150,7 +150,7 @@ uiDropdown items options config = do
   holdDyn Nothing $ indexToItem items <$> evt
 
   where
-    initialValue = _dropdownConf_initialValue config
+    initialValue = _initialValue config
     getIndex v = L.findIndex ((==) v . fst) items
 
 -- | Semantic-UI dropdown with multiple static items
@@ -158,7 +158,7 @@ uiDropdownMulti
   :: (MonadWidget t m, Eq a)
   => [(a, DropdownItemConfig m)]  -- ^ Items
   -> [DropdownOptFlag]            -- ^ Options
-  -> DropdownConf t [a]           -- ^ Dropdown config
+  -> DropdownConfig t [a]           -- ^ Dropdown config
   -> m (Dynamic t [a])
 uiDropdownMulti items options config = do
   (divEl, evt) <- dropdownInternal items options True (void config)
@@ -167,7 +167,7 @@ uiDropdownMulti items options config = do
                   . getIndices
 
   -- setValue events
-  performEvent_ $ setDropdown <$> _dropdownConf_setValue config
+  performEvent_ $ setDropdown <$> _setValue config
 
   -- Set initial value
   pb <- getPostBuild
@@ -176,7 +176,7 @@ uiDropdownMulti items options config = do
   holdDyn [] $ catMaybes . map (indexToItem items) . T.splitOn "," <$> evt
 
   where
-    initialValue = _dropdownConf_initialValue config
+    initialValue = _initialValue config
     getIndices vs = L.findIndices ((`elem` vs) . fst) items
 
 -- | Internal function with shared behaviour
@@ -185,7 +185,7 @@ dropdownInternal
   => [(a, DropdownItemConfig m)]  -- ^ Items
   -> [DropdownOptFlag]            -- ^ Options
   -> Bool                         -- ^ Is multiple dropdown
-  -> DropdownConf t ()            -- ^ Dropdown config
+  -> DropdownConfig t ()            -- ^ Dropdown config
   -> m (El t, Event t Text)
 dropdownInternal items options isMulti config = do
 
@@ -211,11 +211,11 @@ dropdownInternal items options isMulti config = do
   return (divEl, onChangeEvent)
 
   where
-    useLabels = _dropdownConf_useLabels config
-    fullText = _dropdownConf_fullTextSearch config
-    placeholder = _dropdownConf_placeholder config
-    attrs = _dropdownConf_attributes config
-    maxSel = if isMulti then _dropdownConf_maxSelections config
+    useLabels = _useLabels config
+    fullText = _fullTextSearch config
+    placeholder = _placeholder config
+    attrs = _attributes config
+    maxSel = if isMulti then _maxSelections config
                         else Nothing
     multiClass = if isMulti then " multiple" else ""
     classes = dropdownClass options <> multiClass
@@ -224,4 +224,3 @@ dropdownInternal items options isMulti config = do
     putItem i (_, conf) = case conf of
       DropdownItemConfig "" m -> itemDiv i mempty m
       DropdownItemConfig t m -> itemDiv i ("data-text" =: t) m
-

@@ -176,7 +176,7 @@ uiLabeledIconButton
     -> m (Event t ())
 uiLabeledIconButton iconType bDyn iDyn children = do
     uiButton (custom (eText $ setE "labeled" iconType) <$> bDyn) $ do
-      uiIcon (eText iconType) iDyn
+      _ <- uiIcon (eText iconType) iDyn
       children
   where
     eText (Left t) = t

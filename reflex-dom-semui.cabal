@@ -32,6 +32,7 @@ library
     Reflex.Dom.SemanticUI.Dropdown
     Reflex.Dom.SemanticUI.Icon
     Reflex.Dom.SemanticUI.Input
+    Reflex.Dom.SemanticUI.Lenses
     Reflex.Dom.SemanticUI.Modal
     Reflex.Dom.SemanticUI.RadioGroup
 
@@ -42,7 +43,7 @@ library
     , file-embed      >= 0.0.10 && < 0.1
     , ghcjs-dom
     , jsaddle         >= 0.8.0.0 && < 0.10
-    , lens
+    , lens            >= 4.15.2
     , mtl
     , reflex          >= 0.5 && < 0.6
     , reflex-dom-core >= 0.4 && < 0.5
@@ -77,6 +78,7 @@ executable example
     build-depends:
         jsaddle-warp
       , warp
+      , wai
       , wai-app-static
       , websockets
   ghc-prof-options: -fprof-auto
