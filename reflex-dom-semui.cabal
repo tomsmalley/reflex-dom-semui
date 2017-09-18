@@ -20,8 +20,8 @@ library
   hs-source-dirs: src
   js-sources:
     -- Order is important: jquery is used by semantic but must come after.
-    lib/semantic.min.js,
-    lib/jquery.min.js
+      lib/semantic.min.js
+    , lib/jquery.min.js
 
   exposed-modules:
     Reflex.Dom.SemanticUI
@@ -30,6 +30,7 @@ library
     Reflex.Dom.SemanticUI.Common
     Reflex.Dom.SemanticUI.Container
     Reflex.Dom.SemanticUI.Dropdown
+    Reflex.Dom.SemanticUI.Header
     Reflex.Dom.SemanticUI.Icon
     Reflex.Dom.SemanticUI.Input
     Reflex.Dom.SemanticUI.Lenses
@@ -59,14 +60,16 @@ library
 
 executable example
   main-is: Main.hs
-  hs-source-dirs: example, src
+  if impl(ghcjs)
+    hs-source-dirs: example
+  -- This is so 'cabal repl' reloads both lib and exe for rapid iteration
+  else
+    hs-source-dirs: example, src
   other-modules: Example, Example.CountryEnum, Example.StateEnum
   default-language: Haskell2010
   build-depends:
       base            >= 4.8 && < 4.10
     , containers
-    , data-default
-    , file-embed      >= 0.0.10 && < 0.1
     , ghcjs-dom
     , jsaddle         >= 0.8.0.0 && < 0.10
     , lens
@@ -74,13 +77,19 @@ executable example
     , reflex          >= 0.5 && < 0.6
     , reflex-dom-core >= 0.4 && < 0.5
     , text
-  if impl(ghc)
+  if impl(ghcjs)
+    build-depends:
+      reflex-dom-semui
+  else
     build-depends:
         jsaddle-warp
       , warp
       , wai
       , wai-app-static
       , websockets
+      -- library dependencies
+      , file-embed      >= 0.0.10 && < 0.1
+      , data-default
   ghc-prof-options: -fprof-auto
   ghc-options: -threaded -Wall -fwarn-tabs -funbox-strict-fields -O2
 

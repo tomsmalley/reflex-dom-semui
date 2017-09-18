@@ -10,6 +10,7 @@ module Reflex.Dom.SemanticUI.Lenses where
 import Control.Lens.TH
 import Reflex.Dom.SemanticUI.Checkbox
 import Reflex.Dom.SemanticUI.Dropdown
+import Reflex.Dom.SemanticUI.Header
 import Reflex.Dom.SemanticUI.RadioGroup
 
 $(makeFieldsNoPrefix ''Checkbox)
@@ -19,3 +20,6 @@ $(makeFieldsNoPrefix ''DropdownConfig)
 $(makeFieldsNoPrefix ''RadioItem)
 $(makeFieldsNoPrefix ''RadioItemConfig)
 $(makeFieldsNoPrefix ''RadioGroupConfig)
+
+$(makeFieldsNoPrefix ''ImageConfig)
+$(makeFieldsNoPrefix ''HeaderConfig)

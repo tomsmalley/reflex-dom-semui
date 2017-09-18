@@ -152,6 +152,7 @@ checkbox' label CheckboxConfig {..} = do
         suiChecked e _initialValue
         suiEnabled e _initialEnabled
         suiIndeterminate e _initialIndeterminate
+
   pb <- getPostBuild
   performEvent_ $ activate <$ pb
 

@@ -79,7 +79,7 @@ checkboxes = do
       text "Checkboxes"
       uiButton (rightFloated . mini . compact . basic <$> def) $ text "Reset"
 
-  divClass "ui bottom attached segment form" $ do
+  divClass "ui bottom attached clearing segment form" $ do
     divClass "two fields" $ do
 
       divClass "field" $ do
@@ -113,9 +113,6 @@ checkboxes = do
           checkbox blank $
             def & types .~ [CbFitted, CbSlider]
                 & setValue .~ (Unchecked <$ resetEvent)
-
-      elAttr "div" ("style" =: "clear: both;") blank
-
 
       divClass "field" $ do
         let buttonType = small . compact <$> def
@@ -265,10 +262,22 @@ radioGroups = do
       return ()
 
 example :: JSM ()
-example = mainWidgetWithCss css $ elAttr "div" containerAttrs $ do
-  checkboxes
-  dropdowns
-  radioGroups
+example = semanticMain $ do
+  elAttr "div" containerAttrs $ do
+    let semanticLogo = Image "https://semantic-ui.com/images/logo.png" $ def
+          & size ?~ Massive & rounded ?~ Rounded
+    ui $ Header H1 "Semantic UI for Reflex Dom" $ def
+      & image ?~ semanticLogo
+      & subHeader ?~ "Example app"
+
+--      elAttr "img" ("src" =: "https://semantic-ui.com/images/logo.png"
+--                <> "class" =: "ui massive circular image") blank
+--      divClass "content" $ do
+--        text "Semantic UI for Reflex Dom"
+        --divClass "sub header" $ text "Example app"
+    checkboxes
+    dropdowns
+    radioGroups
 
   where
     containerAttrs = "class" =: "ui container" <> "style" =: "margin-top: 1em;"
