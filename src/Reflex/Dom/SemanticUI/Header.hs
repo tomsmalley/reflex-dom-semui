@@ -1,6 +1,9 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Reflex.Dom.SemanticUI.Header where
 
@@ -23,16 +26,18 @@ import           Reflex.Dom.Core hiding
 
 import Debug.Trace
 
-import Reflex.Dom.SemanticUI.Common (jQuery, UiClassText(..), consoleLog)
+import Reflex.Dom.SemanticUI.Icon
+import Reflex.Dom.SemanticUI.Common (jQuery, UiClassText(..), consoleLog, Size(..), uiTextSize, UI (..))
 
 data ImageConfig = ImageConfig
-  { _size :: Maybe ImageSize
+  { _size :: Maybe Size
   , _rounded :: Maybe ImageRounded
   }
 
 instance Default ImageConfig where
   def = ImageConfig
     { _size = Nothing
+    , _rounded = Nothing
     }
 
 data Image = Image
@@ -45,24 +50,18 @@ data ImageRounded = Rounded | Circular deriving (Eq, Show)
 imageRounded :: ImageRounded -> Text
 imageRounded = T.toLower . T.pack . show
 
-class UI a where
-  ui :: MonadWidget t m => a -> m ()
-
-instance UI Image where
+instance UI t m Image where
+  type Return t m Image = ()
   ui (Image src ImageConfig {..}) = elAttr "img" attrs blank
     where
       attrs = "src" =: src <> "class" =: T.unwords classes
       classes = imgRoundedClass $ imgSizeClass [ "ui", "image" ]
-      imgSizeClass = maybe id ((:) . imageSize) _size
+      imgSizeClass = maybe id ((:) . uiTextSize) _size
       imgRoundedClass = maybe id ((:) . imageRounded) _rounded
-
-data ImageSize = Mini | Tiny | Small | Medium | Large | Big | Huge | Massive deriving (Eq, Show)
-
-imageSize :: ImageSize -> Text
-imageSize = T.toLower . T.pack . show
 
 data HeaderConfig = HeaderConfig
   { _image :: Maybe Image
+  , _icon :: Maybe Icon
   , _subHeader :: Maybe Text
   , _header :: HeaderType
   }
@@ -70,6 +69,7 @@ data HeaderConfig = HeaderConfig
 instance Default HeaderConfig where
   def = HeaderConfig
     { _image = Nothing
+    , _icon = Nothing
     , _subHeader = Nothing
     , _header = PageHeader
     }
@@ -101,16 +101,19 @@ data Header = Header
   , _config :: HeaderConfig
   }
 
-instance UI Header where
+instance UI t m Header where
+  type Return t m Header = ()
   ui (Header size txt HeaderConfig {..}) = case _header of
-    PageHeader -> elClass (headerSizeEl size) (T.unwords classes) $ case _image of
-      Nothing -> text txt
-      Just img -> do
-        ui img
-        divClass "content" $ do
-          text txt
-          maybe blank (divClass "sub header" . text) _subHeader
-    ContentHeader -> divClass (T.unwords $ headerSize size : classes) $ text txt
+    PageHeader -> elClass (headerSizeEl size) (T.unwords classes) iContent
+    ContentHeader -> divClass (T.unwords $ headerSize size : classes) iContent
     where
       classes = [ "ui", "header" ]
-
+      iContent
+        | Just img <- _image = ui img >> content
+        | Just icon <- _icon = ui icon >> content
+        | otherwise = content
+      content
+        | Just sub <- _subHeader = divClass "content" $ do
+            text txt
+            divClass "sub header" $ text sub
+        | otherwise = text txt

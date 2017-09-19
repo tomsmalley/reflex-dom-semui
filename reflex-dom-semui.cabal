@@ -15,6 +15,7 @@ cabal-version:       >=1.10
 
 extra-source-files:
   lib/semantic.min.css
+  lib/hscolour.css
 
 library
   hs-source-dirs: src
@@ -39,6 +40,7 @@ library
 
   build-depends:
       base            >= 4.8 && < 4.10
+    , bytestring
     , containers
     , data-default
     , file-embed      >= 0.0.10 && < 0.1
@@ -65,17 +67,21 @@ executable example
   -- This is so 'cabal repl' reloads both lib and exe for rapid iteration
   else
     hs-source-dirs: example, src
-  other-modules: Example, Example.CountryEnum, Example.StateEnum
+  other-modules: Example, Example.CountryEnum, Example.StateEnum, Example.QQ
   default-language: Haskell2010
   build-depends:
       base            >= 4.8 && < 4.10
+    , bytestring
     , containers
     , ghcjs-dom
+    , haskell-src-meta
+    , hscolour
     , jsaddle         >= 0.8.0.0 && < 0.10
     , lens
     , mtl
     , reflex          >= 0.5 && < 0.6
     , reflex-dom-core >= 0.4 && < 0.5
+    , template-haskell
     , text
   if impl(ghcjs)
     build-depends:
@@ -91,7 +97,7 @@ executable example
       , file-embed      >= 0.0.10 && < 0.1
       , data-default
   ghc-prof-options: -fprof-auto
-  ghc-options: -threaded -Wall -fwarn-tabs -funbox-strict-fields -O2
+  ghc-options: -threaded -Wall -fwarn-tabs -funbox-strict-fields -O2 -fno-warn-unused-do-bind
 
 source-repository head
   type: git

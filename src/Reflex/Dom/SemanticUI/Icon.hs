@@ -1,8 +1,10 @@
 {-# LANGUAGE ConstraintKinds          #-}
 {-# LANGUAGE CPP                      #-}
+{-# LANGUAGE DuplicateRecordFields                      #-}
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE InstanceSigs     #-}
 {-# LANGUAGE JavaScriptFFI            #-}
 {-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE OverloadedStrings        #-}
@@ -20,9 +22,129 @@ import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Reflex.Dom.Core hiding (fromJSString)
+import Data.Maybe (catMaybes)
 ------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Common
 ------------------------------------------------------------------------------
+
+data HorizontalAttached = LeftAttached | RightAttached deriving (Eq, Show)
+data VerticalAttached = TopAttached | BottomAttached deriving (Eq, Show)
+
+instance UiClassText VerticalAttached where
+  uiText TopAttached = "top"
+  uiText BottomAttached = "bottom"
+
+instance UiClassText HorizontalAttached where
+  uiText LeftAttached = "left"
+  uiText RightAttached = "right"
+
+combineAttached :: Maybe VerticalAttached -> Maybe HorizontalAttached -> Maybe Text
+combineAttached Nothing Nothing = Nothing
+combineAttached mv mh = Just $ T.unwords $ catMaybes [ uiText <$> mv, uiText <$> mh, Just "attached" ]
+
+data Label = Label Text LabelConfig
+data LabelConfig = LabelConfig
+  { _vAttached :: Maybe VerticalAttached
+  , _hAttached :: Maybe HorizontalAttached
+  , _link :: Bool
+  }
+
+instance Default LabelConfig where
+  def = LabelConfig
+    { _vAttached = Nothing
+    , _hAttached = Nothing
+    , _link = False
+    }
+
+labelConfigClasses :: LabelConfig -> [Text]
+labelConfigClasses LabelConfig {..} = catMaybes
+  [ combineAttached _vAttached _hAttached
+  ]
+
+instance DomBuilder t m => UI t m Label where
+  type Return t m Label = Event t ()
+
+  ui (Label txt config@LabelConfig {..}) = do
+    (e, _) <- elAttr' elType ("class" =: T.unwords classes) $ text txt
+    return $ domEvent Click e
+      where
+        classes = "ui" : "label" : labelConfigClasses config
+        elType = if _link then "a" else "div"
+
+data Icon
+  = Icon Text IconConfig
+  | Icons [Icon] IconsConfig
+
+data IconConfig = IconConfig
+  { _disabled :: Bool
+  , _loading :: Bool
+  , _fitted :: Bool
+  , _size :: Maybe Size
+  , _link :: Bool
+--  , _flipped :: Bool
+--  , _rotated :: Bool
+--  , _circular :: Bool
+--  , _bordered :: Bool
+  , _inverted :: Bool
+  , _color :: Maybe Color
+  }
+
+instance Default IconConfig where
+  def = IconConfig
+    { _disabled = False
+    , _loading = False
+    , _fitted = False
+    , _size = Nothing
+    , _link = False
+    , _inverted = False
+    , _color = Nothing
+    }
+
+iconConfigClasses :: IconConfig -> [Text]
+iconConfigClasses IconConfig {..} = catMaybes
+  [ justWhen _disabled "disabled"
+  , justWhen _loading "loading"
+  , justWhen _fitted "fitted"
+  , justWhen _link "link"
+  , justWhen _inverted "inverted"
+  , uiTextSize <$> nothingIf Medium _size
+  , uiText <$> _color
+  ]
+
+nothingIf :: Eq a => a -> Maybe a -> Maybe a
+nothingIf x (Just y) | x == y = Nothing
+nothingIf _ m = m
+
+justWhen :: Bool -> a -> Maybe a
+justWhen True = Just
+justWhen False = const Nothing
+
+data IconsConfig = IconsConfig
+  { _size :: Maybe Size
+  }
+
+instance Default IconsConfig where
+  def = IconsConfig
+    { _size = Nothing
+    }
+
+--instance UI t m Icons where
+--  type Return t m Icons = ()
+--  ui (Icons IconsConfig {..} icons)
+--    = elAttr "i" ("class" =: T.unwords classes) $ mapM_ ui icons
+--      where classes = "icons" : maybe [] (pure . uiTextSize) _size
+
+instance DomBuilder t m => UI t m Icon where
+  type Return t m Icon = Event t ()
+
+  ui (Icon icon config@IconConfig {..}) = do
+    (e, _) <- elAttr' "i" ("class" =: T.unwords classes) blank
+    return $ domEvent Click e
+      where classes = icon : "icon" : iconConfigClasses config
+
+  ui (Icons icons IconsConfig {..})
+    = elAttr "i" ("class" =: T.unwords classes) $ leftmost <$> traverse ui icons
+      where classes = "icons" : maybe [] (pure . uiTextSize) _size
 
 data UiIcon = UiIcon
     { _uiIcon_size       :: Maybe UiSize

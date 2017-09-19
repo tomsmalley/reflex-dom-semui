@@ -61,6 +61,48 @@ imap f = go 0
 (_:xs) !? n = xs !? (n - 1)
 
 ------------------------------------------------------------------------------
+
+class UI t m a where
+  type Return t m a
+  ui :: MonadWidget t m => a -> m (Return t m a)
+
+data Size = Mini | Tiny | Small | Medium | Large | Big | Huge | Massive deriving (Eq, Show)
+
+uiTextSize :: Size -> Text
+uiTextSize = T.toLower . T.pack . show
+
+data Color
+  = Red
+  | Orange
+  | Yellow
+  | Olive
+  | Green
+  | Teal
+  | Blue
+  | Violet
+  | Purple
+  | Pink
+  | Brown
+  | Grey
+  | Black
+  deriving (Eq,Ord,Read,Show,Enum,Bounded)
+
+instance UiClassText Color where
+  uiText Red = "red"
+  uiText Orange = "orange"
+  uiText Yellow = "yellow"
+  uiText Olive = "olive"
+  uiText Green = "green"
+  uiText Teal = "teal"
+  uiText Blue = "blue"
+  uiText Violet = "violet"
+  uiText Purple = "purple"
+  uiText Pink = "pink"
+  uiText Brown = "brown"
+  uiText Grey = "grey"
+  uiText Black = "black"
+
+
 -- | A type class for converting data types into appropriate  Semantic UI
 -- class text.
 class UiClassText a where

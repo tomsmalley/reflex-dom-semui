@@ -15,16 +15,18 @@ module Reflex.Dom.SemanticUI
   , module Reflex.Dom.SemanticUI.RadioGroup
   , semanticCSS
   , semanticMain
+  , semanticMainWithCss
   , module Reflex.Dom.Core
   ) where
 
 ------------------------------------------------------------------------------
+import           Data.ByteString
 import           Data.FileEmbed
 import           Data.Text (Text)
 ------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Button
 import           Reflex.Dom.SemanticUI.Checkbox
-import           Reflex.Dom.SemanticUI.Common
+import           Reflex.Dom.SemanticUI.Common (basic, mini, compact, rightFloated, custom, tshow, Color (..), Size (..), small, ui)
 import           Reflex.Dom.SemanticUI.Dropdown
 import           Reflex.Dom.SemanticUI.Header
 import           Reflex.Dom.SemanticUI.Icon
@@ -37,6 +39,7 @@ import Reflex.Dom.Core hiding
   , CheckboxConfig (..), checkboxConfig_attributes, checkboxConfig_setValue
   , HasSetValue (..), HasValue (..), HasAttributes (..)
   , DropdownConfig (..), dropdown_change, dropdown_value
+  , link
   )
 import Language.Javascript.JSaddle (JSM)
 ------------------------------------------------------------------------------
@@ -50,3 +53,7 @@ semanticCSS = $(embedStringFile "lib/semantic.min.css")
 --semanticMain :: MonadWidget t m => m () -> JSM ()
 semanticMain :: (forall x. Widget x ()) -> JSM ()
 semanticMain = mainWidgetWithCss $(embedStringFile "lib/semantic.min.css")
+
+--semanticMain :: MonadWidget t m => m () -> JSM ()
+semanticMainWithCss :: ByteString -> (forall x. Widget x ()) -> JSM ()
+semanticMainWithCss css = mainWidgetWithCss $ css `mappend` $(embedStringFile "lib/semantic.min.css")

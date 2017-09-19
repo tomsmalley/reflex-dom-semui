@@ -1,7 +1,7 @@
-{ mkDerivation, base, containers, data-default, file-embed
-, ghcjs-dom, jsaddle, jsaddle-warp, lens, mtl, reflex
-, reflex-dom-core, stdenv, text, wai-app-static, warp
-, websockets, ghc
+{ mkDerivation, base, bytestring, containers, data-default, file-embed
+, ghcjs-dom, haskell-src-exts, hscolour, jsaddle, jsaddle-warp
+, lens, mtl, reflex, reflex-dom-core, stdenv, template-haskell
+, text, wai-app-static, warp, websockets, ghc
 }:
 mkDerivation rec {
   pname = "reflex-dom-semui";
@@ -13,15 +13,19 @@ mkDerivation rec {
   isExecutable = true;
   buildDepends = [
     base
+    bytestring
     containers
     data-default
     file-embed
     ghcjs-dom
+    haskell-src-exts
+    hscolour
     jsaddle
     lens
     mtl
     reflex
     reflex-dom-core
+    template-haskell
     text
   ] ++ (if ghc.isGhcjs or false then [
   ] else if stdenv.isDarwin then [

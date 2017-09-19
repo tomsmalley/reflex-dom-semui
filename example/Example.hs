@@ -3,11 +3,16 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE RecursiveDo       #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Example (example) where
 
 import Control.Lens
 import Control.Monad (void)
+import Control.Monad.Trans (liftIO)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -15,10 +20,11 @@ import Data.Text.Encoding (encodeUtf8)
 import Reflex.Dom.SemanticUI
 import Language.Javascript.JSaddle hiding ((!!))
 
-import Debug.Trace
-
 import Example.StateEnum
 import Example.CountryEnum
+import Example.QQ
+
+import Debug.Trace
 
 -- | Throughput
 data Throughput = Unmetered | Metered Int deriving (Eq, Show)
@@ -261,23 +267,64 @@ radioGroups = do
                   & types .~ [CbSlider]
       return ()
 
-example :: JSM ()
-example = semanticMain $ do
-  elAttr "div" containerAttrs $ do
-    let semanticLogo = Image "https://semantic-ui.com/images/logo.png" $ def
-          & size ?~ Massive & rounded ?~ Rounded
-    ui $ Header H1 "Semantic UI for Reflex Dom" $ def
-      & image ?~ semanticLogo
-      & subHeader ?~ "Example app"
+hscolourCss :: IO ByteString
+hscolourCss = BS.readFile "lib/hscolour.css"
 
---      elAttr "img" ("src" =: "https://semantic-ui.com/images/logo.png"
---                <> "class" =: "ui massive circular image") blank
---      divClass "content" $ do
---        text "Semantic UI for Reflex Dom"
-        --divClass "sub header" $ text "Example app"
-    checkboxes
-    dropdowns
-    radioGroups
+example :: JSM ()
+example = do
+  css <- liftIO hscolourCss
+  semanticMainWithCss css $ do
+    elAttr "div" containerAttrs $ do
+      let semanticLogo = Image "https://semantic-ui.com/images/logo.png" $ def
+            & size ?~ Massive & rounded ?~ Rounded
+      ui $ Header H1 "Semantic UI for Reflex Dom" $ def
+        & image ?~ semanticLogo
+        & subHeader ?~ "Example app"
+
+      ui $ Header H2 "Icon" def
+
+      ui $ Header H3 "Groups" def
+
+      ui $ Header H4 "Icons" $ def
+        & subHeader ?~ "Several icons can be used together as a group"
+
+      [ex|
+      ui $ Icons
+        [ Icon "circle" $ def & size ?~ Big & color ?~ Blue
+        , Icon "car" $ def & inverted .~ True
+        ] $ def & size ?~ Huge
+      ui $ Icons
+        [ Icon "thin circle" $ def & size ?~ Big
+        , Icon "user" def
+        ] $ def & size ?~ Huge
+      ui $ Icons
+        [ Icon "certificate" $ def
+            & size ?~ Big & loading .~ True
+            & color ?~ Grey & inverted .~ True
+        , Icon "cloud download" def
+        ] $ def & size ?~ Huge
+      |]
+
+
+      ui $ Header H4 "Corner Icon" $ def
+        & subHeader ?~ "A group of icons can display a smaller corner icon"
+
+      [ex|
+      ui $ Header H2 "Add on Twitter" $ def
+        & icon ?~ Icons
+            [ Icon "twitter" def
+            , Icon "corner add" $ def & inverted .~ True
+            ] (def & size ?~ Large)
+      |]
+
+  --      elAttr "img" ("src" =: "https://semantic-ui.com/images/logo.png"
+  --                <> "class" =: "ui massive circular image") blank
+  --      divClass "content" $ do
+  --        text "Semantic UI for Reflex Dom"
+          --divClass "sub header" $ text "Example app"
+      checkboxes
+      dropdowns
+      radioGroups
 
   where
     containerAttrs = "class" =: "ui container" <> "style" =: "margin-top: 1em;"
