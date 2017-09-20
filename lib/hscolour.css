@@ -1,11 +1,15 @@
 
 .haskell pre {
   color: #bbbbbb;
-  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-family: Menlo, monospace;
   font-size: 12px;
   overflow: auto;
   margin: 0;
   padding: 0;
+}
+
+code.inline {
+  display: inline;
 }
 
 /* From hackage-css manni.css */

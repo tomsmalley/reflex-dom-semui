@@ -98,7 +98,7 @@ radioGroup
   -> [RadioItem t m a]      -- ^ Items
   -> RadioGroupConfig t m a -- ^ Group config
   -> m (Dynamic t (Maybe a))
-radioGroup name items config = do
+radioGroup name items config = divClass "grouped fields" $ do
 
   -- Insert all of the items, collecting the raw elements and wrapping them with
   -- the given wrapper function

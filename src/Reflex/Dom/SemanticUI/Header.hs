@@ -13,6 +13,7 @@ import           Control.Lens ((^.))
 import           Data.Default (Default (def))
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Maybe (catMaybes)
 import           Data.Semigroup ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -64,7 +65,15 @@ data HeaderConfig = HeaderConfig
   , _icon :: Maybe Icon
   , _subHeader :: Maybe Text
   , _header :: HeaderType
+  , _dividing :: Bool
+  , _floated :: Maybe Floated
   }
+
+data Floated = LeftFloated | RightFloated deriving (Eq, Show)
+
+instance UiClassText Floated where
+  uiText LeftFloated = "left floated"
+  uiText RightFloated = "left floated"
 
 instance Default HeaderConfig where
   def = HeaderConfig
@@ -72,7 +81,15 @@ instance Default HeaderConfig where
     , _icon = Nothing
     , _subHeader = Nothing
     , _header = PageHeader
+    , _dividing = False
+    , _floated = Nothing
     }
+
+headerConfigClasses :: HeaderConfig -> [Text]
+headerConfigClasses HeaderConfig {..} = catMaybes
+  [ justWhen _dividing "dividing"
+  , uiText <$> _floated
+  ]
 
 data HeaderType = PageHeader | ContentHeader
 
@@ -103,11 +120,12 @@ data Header = Header
 
 instance UI t m Header where
   type Return t m Header = ()
-  ui (Header size txt HeaderConfig {..}) = case _header of
+  ui (Header size txt config@HeaderConfig {..}) = case _header of
     PageHeader -> elClass (headerSizeEl size) (T.unwords classes) iContent
     ContentHeader -> divClass (T.unwords $ headerSize size : classes) iContent
     where
-      classes = [ "ui", "header" ]
+      -- TODO: make this like the icons
+      classes = "ui" : "header" : headerConfigClasses config
       iContent
         | Just img <- _image = ui img >> content
         | Just icon <- _icon = ui icon >> content

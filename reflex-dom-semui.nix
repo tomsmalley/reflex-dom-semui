@@ -1,5 +1,5 @@
 { mkDerivation, base, bytestring, containers, data-default, file-embed
-, ghcjs-dom, haskell-src-exts, hscolour, jsaddle, jsaddle-warp
+, ghcjs-dom, haskell-src-exts, haskell-src-meta, hscolour, jsaddle, jsaddle-warp
 , lens, mtl, reflex, reflex-dom-core, stdenv, template-haskell
 , text, wai-app-static, warp, websockets, ghc
 }:
@@ -7,7 +7,7 @@ mkDerivation rec {
   pname = "reflex-dom-semui";
   version = "0.1";
   src = builtins.filterSource (path: type: !(builtins.elem (baseNameOf path)
-    [ ".git" "dist" "docs" ]
+    [ "makedocs.sh" ".git" "dist" "docs" ]
   )) ./.;
   isLibrary = true;
   isExecutable = true;
@@ -19,6 +19,7 @@ mkDerivation rec {
     file-embed
     ghcjs-dom
     haskell-src-exts
+    haskell-src-meta
     hscolour
     jsaddle
     lens

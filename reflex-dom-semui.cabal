@@ -19,10 +19,10 @@ extra-source-files:
 
 library
   hs-source-dirs: src
-  js-sources:
-    -- Order is important: jquery is used by semantic but must come after.
-      lib/semantic.min.js
-    , lib/jquery.min.js
+--  js-sources:
+--    -- Order is important: jquery is used by semantic but must come after.
+--      lib/semantic.min.js
+--    , lib/jquery.min.js
 
   exposed-modules:
     Reflex.Dom.SemanticUI
@@ -73,7 +73,9 @@ executable example
       base            >= 4.8 && < 4.10
     , bytestring
     , containers
+    , file-embed      >= 0.0.10 && < 0.1
     , ghcjs-dom
+    , haskell-src-exts
     , haskell-src-meta
     , hscolour
     , jsaddle         >= 0.8.0.0 && < 0.10
@@ -94,7 +96,6 @@ executable example
       , wai-app-static
       , websockets
       -- library dependencies
-      , file-embed      >= 0.0.10 && < 0.1
       , data-default
   ghc-prof-options: -fprof-auto
   ghc-options: -threaded -Wall -fwarn-tabs -funbox-strict-fields -O2 -fno-warn-unused-do-bind

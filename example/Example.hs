@@ -9,10 +9,11 @@
 module Example (example) where
 
 import Control.Lens
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Monad.Trans (liftIO)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.FileEmbed
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -80,45 +81,62 @@ renderCard card = do
 checkboxes :: MonadWidget t m => m ()
 checkboxes = do
 
-  resetEvent <- divClass "ui top attached segment" $ do
-    elClass "h4" "ui header" $ do
-      text "Checkboxes"
-      uiButton (rightFloated . mini . compact . basic <$> def) $ text "Reset"
+  ui $ Header H2 "Checkboxes" $ def & dividing .~ True
+  resetEvent <- uiButton (rightFloated . mini . compact . basic <$> def) $ text "Reset"
 
-  divClass "ui bottom attached clearing segment form" $ do
-    divClass "two fields" $ do
+  divClass "ui two column grid container" $ do
 
-      divClass "field" $ do
-        el "label" $ text "Checkboxes with labels"
-        divClass "ui compact segment" $ do
-          cb <- checkbox (text "Normal checkbox") $
+    divClass "row" $ do
+
+      divClass "column" $ do
+        exampleCardDyn id "Checkboxes with labels" "" [mkExample|
+        divClass "ui form" $ do
+          normal <- divClass "field" $ checkbox (text "Normal checkbox") $
             def & setValue .~ (Unchecked <$ resetEvent)
-          divClass "ui left pointing label" $ display $ view value cb
-        divClass "ui compact segment" $ do
-          cb <- checkbox (text "Toggle checkbox (checked by default)") $
+          toggle <- divClass "field" $ checkbox (text "Toggle checkbox (checked by default)") $
             def & types .~ [CbToggle]
                 & setValue .~ (Checked <$ resetEvent)
                 & initialValue .~ Checked
-          divClass "ui left pointing label" $ display $ view value cb
-        divClass "ui compact segment" $ do
-          cb <- checkbox (text "Slider checkbox") $
+          slider <- divClass "field" $ checkbox (text "Slider checkbox") $
             def & types .~ [CbSlider]
                 & setValue .~ (Unchecked <$ resetEvent)
-          divClass "ui left pointing label" $ display $ view value cb
+          return $ traverse (view value) [normal, slider, toggle]
+        |]
 
-        el "label" $ text "Fitted checkboxes"
-        void $ divClass "ui left floated compact segment" $ do
-          checkbox blank $
+      divClass "column" $ do
+        exampleCardDyn id "Fitted checkboxes" "" [mkExample|
+        normal <- divClass "ui compact segment" $ checkbox blank $
             def & types .~ [CbFitted]
                 & setValue .~ (Unchecked <$ resetEvent)
-        void $ divClass "ui left floated compact segment" $ do
-          checkbox blank $
+        slider <- divClass "ui compact segment" $ checkbox blank $
             def & types .~ [CbFitted, CbToggle]
                 & setValue .~ (Unchecked <$ resetEvent)
-        void $ divClass "ui left floated compact segment" $ do
-          checkbox blank $
+        toggle <- divClass "ui compact segment" $ checkbox blank $
             def & types .~ [CbFitted, CbSlider]
                 & setValue .~ (Unchecked <$ resetEvent)
+        return $ traverse (view value) [normal, slider, toggle]
+        |]
+
+    divClass "row" $ do
+
+      divClass "column" $ do
+        exampleCardDyn id "Checkbox states" "Checkboxes can be enabled or disabled" [mkExample|
+        enable <- uiButton (custom "left attached" <$> def) $ text "Enable"
+        disable <- uiButton (custom "right attached" <$> def) $ text "Disable"
+        let enableEvent = leftmost [Enabled <$ enable, Disabled <$ disable]
+        divClass "ui form" $ do
+          normal <- divClass "field" $ checkbox (text "Initially disabled") $
+            def & setValue .~ (Unchecked <$ resetEvent)
+                & initialEnabled .~ Disabled
+                & setEnabled .~ leftmost [enableEvent, Disabled <$ resetEvent]
+          toggle <- divClass "field" $ checkbox (text "Initially disabled (checked by default)") $
+            def & types .~ [CbToggle]
+                & setValue .~ (Checked <$ resetEvent)
+                & initialEnabled .~ Disabled
+                & initialValue .~ Checked
+                & setEnabled .~ leftmost [enableEvent, Disabled <$ resetEvent]
+          return $ traverse (\cb -> (\x y -> (x, y)) <$> (view value cb) <*> (view enabled cb)) [normal, toggle]
+        |]
 
       divClass "field" $ do
         let buttonType = small . compact <$> def
@@ -236,95 +254,116 @@ dropdowns = do
 radioGroups :: forall t m. MonadWidget t m => m ()
 radioGroups = do
 
-  resetEvent <- divClass "ui top attached segment" $ do
-    elClass "h4" "ui header" $ do
-      text "Radio Groups"
-      uiButton (rightFloated . mini . compact . basic <$> def) $ text "Reset"
+  ui $ Header H2 "Radio Groups" $ def & dividing .~ True
+  resetEvent <- uiButton (rightFloated . mini . compact . basic <$> def) $ text "Reset"
 
-  divClass "ui bottom attached segment form" $ do
-    let makeFreq x = RadioItem x (text $ showFreq x) def
-        freqencies = map makeFreq [minBound..maxBound]
-        makeThru x = RadioItem x (text $ showThroughput x) def
-        throughputs = map makeThru [Metered 20, Metered 10, Metered 5, Unmetered]
+  divClass "ui two column grid container" $ do
+    divClass "row" $ do
+      divClass "column" $ do
+        exampleCardDyn id "Radio group" "" [mkExample|
+        let mkRadioItem x = RadioItem x (text $ showFreq x) def
+            freqencies = map mkRadioItem [minBound..maxBound]
+        divClass "ui form" $ radioGroup "frequency" freqencies $
+          def & setValue .~ (Nothing <$ resetEvent)
+        |]
 
-    divClass "field" $ do
-      rec el "label" $ do
-            text "Normal radio group"
-            divClass "ui left pointing label" $ display frequency
-          frequency <- divClass "inline fields" $ do
-            radioGroup "frequency" freqencies $
-              def & setValue .~ (Nothing <$ resetEvent)
-      return ()
+      divClass "column" $ do
+        exampleCardDyn id "Slider group" "" [mkExample|
+        let mkRadioItem x = RadioItem x (text $ T.pack $ show x) def
+            throughputs = mkRadioItem <$> [Metered 20, Metered 10, Metered 5, Unmetered]
+        divClass "ui form" $ radioGroup "throughput" throughputs $
+          def & initialValue ?~ Unmetered
+              & setValue .~ (Just Unmetered <$ resetEvent)
+              & types .~ [CbSlider]
+        |]
 
-    divClass "field" $ do
-      rec el "label" $ do
-            text "Slider group"
-            divClass "ui left pointing label" $ display throughput
-          throughput <- divClass "grouped fields" $ do
-            radioGroup "throughput" throughputs $
-              def & initialValue ?~ Unmetered
-                  & setValue .~ (Just Unmetered <$ resetEvent)
-                  & types .~ [CbSlider]
-      return ()
+  return ()
 
-hscolourCss :: IO ByteString
-hscolourCss = BS.readFile "lib/hscolour.css"
+hscolourCss :: ByteString
+hscolourCss = $(embedStringFile "lib/hscolour.css")
+
+exampleCard :: MonadWidget t m => Text -> Text -> (String, m a) -> m a
+exampleCard title subtitle (code, widget) = divClass "ui fluid card" $ do
+  divClass "content" $ do
+    divClass "header" (text title)
+    when (subtitle /= "") $ divClass "meta" (text subtitle)
+  widgetResult <- divClass "content" widget
+  isOpen <- divClass "content" $ toggleUI' $ \isOpen ->
+    uiButton def $ if isOpen then text "hide code" else text "show code"
+  void $ dyn $ codeEl <$> isOpen
+  return widgetResult
+  where
+    codeEl False = blank
+    codeEl True = divClass "content" $ hscode code
+
+exampleCardDyn :: (Show a, MonadWidget t m) => (b -> Dynamic t a) -> Text -> Text
+               -> (String, m b) -> m (Dynamic t a)
+exampleCardDyn getDyn title subtitle (code, widget) = divClass "ui fluid card" $ do
+  divClass "content" $ do
+    divClass "header" (text title)
+    when (subtitle /= "") $ divClass "meta" (text subtitle)
+  widgetResult <- getDyn <$> divClass "content" widget
+  divClass "extra content" $ do
+    ui $ Header H4 "Value" $ def & header .~ ContentHeader
+    dyn $ hscodeInline . show <$> widgetResult
+  isOpen <- divClass "content" $ toggleUI' $ \isOpen ->
+    uiButton (custom "labeled icon" <$> def) $ if isOpen
+      then ui (Icon "minus" def) >> text "Hide Code"
+      else ui (Icon "plus" def) >> text "Show Code"
+  void $ dyn $ codeEl <$> isOpen
+  return widgetResult
+  where
+    codeEl False = blank
+    codeEl True = divClass "content" $ hscode code
 
 example :: JSM ()
-example = do
-  css <- liftIO hscolourCss
-  semanticMainWithCss css $ do
-    elAttr "div" containerAttrs $ do
-      let semanticLogo = Image "https://semantic-ui.com/images/logo.png" $ def
-            & size ?~ Massive & rounded ?~ Rounded
-      ui $ Header H1 "Semantic UI for Reflex Dom" $ def
-        & image ?~ semanticLogo
-        & subHeader ?~ "Example app"
+example = semanticMainWithCss hscolourCss $ do
+  elAttr "div" containerAttrs $ do
+    let semanticLogo = Image "https://semantic-ui.com/images/logo.png" $ def
+          & size ?~ Massive & rounded ?~ Rounded
+    ui $ Header H1 "Semantic UI for Reflex Dom" $ def
+      & image ?~ semanticLogo
+      & subHeader ?~ "Example app"
 
-      ui $ Header H2 "Icon" def
+    ui $ Header H2 "Icon" def
 
-      ui $ Header H3 "Groups" def
+    $(printDefinition ''Icon)
 
-      ui $ Header H4 "Icons" $ def
-        & subHeader ?~ "Several icons can be used together as a group"
+    ui $ Header H3 "Groups" def
 
-      [ex|
-      ui $ Icons
-        [ Icon "circle" $ def & size ?~ Big & color ?~ Blue
-        , Icon "car" $ def & inverted .~ True
-        ] $ def & size ?~ Huge
-      ui $ Icons
-        [ Icon "thin circle" $ def & size ?~ Big
-        , Icon "user" def
-        ] $ def & size ?~ Huge
-      ui $ Icons
-        [ Icon "certificate" $ def
-            & size ?~ Big & loading .~ True
-            & color ?~ Grey & inverted .~ True
-        , Icon "cloud download" def
-        ] $ def & size ?~ Huge
-      |]
+    divClass "ui three column grid container" $ do
+      divClass "row" $ do
+        divClass "column" $ do
+          exampleCard "Icons" "Several icons can be used together as a group" [mkExample|
+          ui $ Icons
+            [ Icon "circle" $ def & size ?~ Big & color ?~ Blue
+            , Icon "car" $ def & inverted .~ True
+            ] $ def & size ?~ Huge
+          ui $ Icons
+            [ Icon "thin circle" $ def & size ?~ Big
+            , Icon "user" def
+            ] $ def & size ?~ Huge
+          ui $ Icons
+            [ Icon "certificate" $ def
+                & size ?~ Big & loading .~ True
+                & color ?~ Grey & inverted .~ True
+            , Icon "cloud download" def
+            ] $ def & size ?~ Huge
+          |]
 
+        divClass "column" $ do
+          exampleCard "Corner Icon" "A group of icons can display a smaller corner icon"
+            [mkExample|
+          ui $ Header H2 "Add on Twitter" $ def
+            & icon ?~ Icons
+                [ Icon "twitter" def
+                , Icon "corner add" $ def & inverted .~ True
+                ] (def & size ?~ Large)
+          |]
 
-      ui $ Header H4 "Corner Icon" $ def
-        & subHeader ?~ "A group of icons can display a smaller corner icon"
-
-      [ex|
-      ui $ Header H2 "Add on Twitter" $ def
-        & icon ?~ Icons
-            [ Icon "twitter" def
-            , Icon "corner add" $ def & inverted .~ True
-            ] (def & size ?~ Large)
-      |]
-
-  --      elAttr "img" ("src" =: "https://semantic-ui.com/images/logo.png"
-  --                <> "class" =: "ui massive circular image") blank
-  --      divClass "content" $ do
-  --        text "Semantic UI for Reflex Dom"
-          --divClass "sub header" $ text "Example app"
-      checkboxes
-      dropdowns
-      radioGroups
+    checkboxes
+    dropdowns
+    radioGroups
 
   where
     containerAttrs = "class" =: "ui container" <> "style" =: "margin-top: 1em;"
