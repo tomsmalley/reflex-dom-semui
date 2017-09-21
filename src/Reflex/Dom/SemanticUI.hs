@@ -26,7 +26,7 @@ import           Data.Text (Text)
 ------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Button
 import           Reflex.Dom.SemanticUI.Checkbox
-import           Reflex.Dom.SemanticUI.Common (basic, mini, compact, rightFloated, custom, tshow, Color (..), Size (..), small, ui)
+import           Reflex.Dom.SemanticUI.Common (basic, mini, compact, rightFloated, custom, tshow, Color (..), Size (..), small, ui, Floated(..))
 import           Reflex.Dom.SemanticUI.Dropdown
 import           Reflex.Dom.SemanticUI.Header
 import           Reflex.Dom.SemanticUI.Icon

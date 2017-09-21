@@ -64,7 +64,6 @@ dropdownClass opts = T.unwords $ "ui" : (flags ++ ["dropdown"])
 
 ------------------------------------------------------------------------------
 
-
 -- | Given a div element, tell semantic-ui to convert it to a dropdown with the
 -- given options. The callback function is called on change with the currently
 -- selected value.
@@ -84,7 +83,7 @@ activateDropdown e maxSel useLabels fullText onChange = do
 -- dropdowns just provide a singleton list.
 dropdownSetExactly :: DOM.Element -> [Int] -> JSM ()
 dropdownSetExactly e is
-  = void $ jQuery e ^. js2 ("dropdown" :: Text) ("set exactly" :: Text) is
+  = void $ jQuery e ^. js2 ("dropdown" :: Text) ("set exactly" :: Text) (map show is)
 
 ------------------------------------------------------------------------------
 

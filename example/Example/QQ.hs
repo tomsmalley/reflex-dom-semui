@@ -71,6 +71,11 @@ mkExample = QuasiQuoter
   , quoteDec = const $ error "ex: not an expression"
   }
 
+mkResetExample :: QuasiQuoter
+mkResetExample = mkExample
+  { quoteExp = \ex -> [|(ex, $(eitherQ id $ parseExp $ "\resetEvent -> do\n" ++ ex))|]
+  }
+
 exWithValue :: QuasiQuoter
 exWithValue = ex { quoteExp = \ex -> [|exampleWrapperDyn ex $(eitherQ id (parseExp $ "do\n" ++ ex))|] }
 

@@ -74,6 +74,7 @@ executable example
     , bytestring
     , containers
     , file-embed      >= 0.0.10 && < 0.1
+    , ghc-prim
     , ghcjs-dom
     , haskell-src-exts
     , haskell-src-meta

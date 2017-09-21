@@ -66,10 +66,16 @@ class UI t m a where
   type Return t m a
   ui :: MonadWidget t m => a -> m (Return t m a)
 
+data Floated = LeftFloated | RightFloated deriving (Eq, Show)
+
+instance UiClassText Floated where
+  uiText LeftFloated = "left floated"
+  uiText RightFloated = "right floated"
+
 data Size = Mini | Tiny | Small | Medium | Large | Big | Huge | Massive deriving (Eq, Show)
 
-uiTextSize :: Size -> Text
-uiTextSize = T.toLower . T.pack . show
+instance UiClassText Size where
+  uiText = T.toLower . T.pack . show
 
 data Color
   = Red

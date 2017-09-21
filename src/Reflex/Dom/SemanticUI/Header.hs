@@ -28,7 +28,7 @@ import           Reflex.Dom.Core hiding
 import Debug.Trace
 
 import Reflex.Dom.SemanticUI.Icon
-import Reflex.Dom.SemanticUI.Common (jQuery, UiClassText(..), consoleLog, Size(..), uiTextSize, UI (..))
+import Reflex.Dom.SemanticUI.Common (jQuery, UiClassText(..), consoleLog, Size(..), UI (..), Floated(..))
 
 data ImageConfig = ImageConfig
   { _size :: Maybe Size
@@ -57,7 +57,7 @@ instance UI t m Image where
     where
       attrs = "src" =: src <> "class" =: T.unwords classes
       classes = imgRoundedClass $ imgSizeClass [ "ui", "image" ]
-      imgSizeClass = maybe id ((:) . uiTextSize) _size
+      imgSizeClass = maybe id ((:) . uiText) _size
       imgRoundedClass = maybe id ((:) . imageRounded) _rounded
 
 data HeaderConfig = HeaderConfig
@@ -68,12 +68,6 @@ data HeaderConfig = HeaderConfig
   , _dividing :: Bool
   , _floated :: Maybe Floated
   }
-
-data Floated = LeftFloated | RightFloated deriving (Eq, Show)
-
-instance UiClassText Floated where
-  uiText LeftFloated = "left floated"
-  uiText RightFloated = "left floated"
 
 instance Default HeaderConfig where
   def = HeaderConfig

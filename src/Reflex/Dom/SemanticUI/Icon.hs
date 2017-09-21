@@ -19,6 +19,7 @@ module Reflex.Dom.SemanticUI.Icon where
 ------------------------------------------------------------------------------
 import           Data.Default
 import           Data.Maybe
+import           Data.Semigroup ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Reflex.Dom.Core hiding (fromJSString)
@@ -81,6 +82,8 @@ data IconConfig = IconConfig
   , _fitted :: Bool
   , _size :: Maybe Size
   , _link :: Bool
+  , _floated :: Maybe Floated
+  , _title :: Maybe Text
 --  , _flipped :: Bool
 --  , _rotated :: Bool
 --  , _circular :: Bool
@@ -96,6 +99,8 @@ instance Default IconConfig where
     , _fitted = False
     , _size = Nothing
     , _link = False
+    , _floated = Nothing
+    , _title = Nothing
     , _inverted = False
     , _color = Nothing
     }
@@ -107,7 +112,8 @@ iconConfigClasses IconConfig {..} = catMaybes
   , justWhen _fitted "fitted"
   , justWhen _link "link"
   , justWhen _inverted "inverted"
-  , uiTextSize <$> nothingIf Medium _size
+  , uiText <$> nothingIf Medium _size
+  , uiText <$> _floated
   , uiText <$> _color
   ]
 
@@ -138,13 +144,16 @@ instance DomBuilder t m => UI t m Icon where
   type Return t m Icon = Event t ()
 
   ui (Icon icon config@IconConfig {..}) = do
-    (e, _) <- elAttr' "i" ("class" =: T.unwords classes) blank
+    (e, _) <- elAttr' "i" ("class" =: T.unwords classes <> mtitle) blank
     return $ domEvent Click e
       where classes = icon : "icon" : iconConfigClasses config
+            mtitle
+              | Just title <- _title = "title" =: title
+              | otherwise = mempty
 
   ui (Icons icons IconsConfig {..})
     = elAttr "i" ("class" =: T.unwords classes) $ leftmost <$> traverse ui icons
-      where classes = "icons" : maybe [] (pure . uiTextSize) _size
+      where classes = "icons" : maybe [] (pure . uiText) _size
 
 data UiIcon = UiIcon
     { _uiIcon_size       :: Maybe UiSize

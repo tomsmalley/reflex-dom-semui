@@ -1,4 +1,27 @@
 
+#masthead.segment {
+  padding: 3em 0;
+}
+#masthead > .container {
+  margin-right: 387px !important;
+  margin-left: 3em !important;
+}
+
+#main.container {
+  position: relative;
+  padding: 2em 0 6em;
+  margin-right: 387px !important;
+  margin-left: 3em !important;
+  width: auto !important;
+}
+#main.container > .right.rail {
+  margin-left: 3em;
+  padding-top: 2.5em;
+}
+
+#main.container .card {
+}
+
 .haskell pre {
   color: #bbbbbb;
   font-family: Menlo, monospace;
