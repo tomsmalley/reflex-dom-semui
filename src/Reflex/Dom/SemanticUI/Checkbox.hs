@@ -1,4 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE Rank2Types             #-}
@@ -9,14 +10,13 @@
 module Reflex.Dom.SemanticUI.Checkbox
   (
   -- * Checkbox
-    checkbox
-  , checkbox'
+    Checkbox (..)
   , CheckboxType (..)
   , Enabled (..)
   , Indeterminate (..)
   , Checked (..)
   -- * Return type
-  , Checkbox (..)
+  , CheckboxResult (..)
   -- * Config
   , CheckboxConfig (..)
 
@@ -41,7 +41,7 @@ import           Reflex.Dom.Core hiding
 
 import Debug.Trace
 
-import Reflex.Dom.SemanticUI.Common (jQuery, UiClassText(..), consoleLog)
+import Reflex.Dom.SemanticUI.Common
 
 --------------------------------------------------------------------------------
 -- Types
@@ -55,27 +55,26 @@ data Indeterminate = Determinate | Indeterminate deriving (Eq, Show)
 -- | Enabled state of a checkbox
 data Enabled = Enabled | Disabled deriving (Eq, Show)
 
-data Checkbox t = Checkbox
+data CheckboxResult t = CheckboxResult
   { _value :: Dynamic t Checked
   , _change :: Event t Checked
   , _enabled :: Dynamic t Enabled
   , _indeterminate :: Dynamic t Indeterminate
   }
 
-instance HasValue (Checkbox t) where
-  type Value (Checkbox t) = Dynamic t Checked
+instance HasValue (CheckboxResult t) where
+  type Value (CheckboxResult t) = Dynamic t Checked
   value = _value
 
 -- | Checkbox types according to https://semantic-ui.com/modules/checkbox.html.
 -- If you need a radio type, see <RadioGroup>.
-data CheckboxType =  CbSlider | CbToggle | CbFitted
-  deriving Eq
+data CheckboxType =  Slider | Toggle | Fitted deriving (Eq, Show)
 
 -- | Convert an option to its class representation
 instance UiClassText CheckboxType where
-  uiText CbSlider = "slider"
-  uiText CbToggle = "toggle"
-  uiText CbFitted = "fitted"
+  uiText Slider = "slider"
+  uiText Toggle = "toggle"
+  uiText Fitted = "fitted"
 
 data CheckboxConfig t = CheckboxConfig
   { _initialValue :: Checked
@@ -111,25 +110,24 @@ instance Reflex t => Default (CheckboxConfig t) where
     , _types = mempty
     }
 
+data Checkbox t = Checkbox
+  { _label :: Text
+  , _config :: CheckboxConfig t
+  }
+
+instance UI t (Checkbox t) where
+  type Return t (Checkbox t) = CheckboxResult t
+  ui' (Checkbox label config) = checkbox' (text label) config
+
 --------------------------------------------------------------------------------
 -- Checkbox Functions
-
--- | Create a checkbox.
---
--- https://semantic-ui.com/modules/checkbox.html
-checkbox
-  :: MonadWidget t m
-  => m ()             -- ^ Label contents
-  -> CheckboxConfig t -- ^ Checkbox config
-  -> m (Checkbox t)
-checkbox label config = fmap snd $ checkbox' label config
 
 -- | Create a checkbox, also returning the top level \<div\> element.
 checkbox'
   :: MonadWidget t m
   => m ()             -- ^ Label contents
   -> CheckboxConfig t -- ^ Checkbox config
-  -> m (El t, Checkbox t)
+  -> m (El t, CheckboxResult t)
 checkbox' label CheckboxConfig {..} = do
 
   (cbEl, _) <- elAttr' "div" divAttrs $ do
@@ -164,7 +162,7 @@ checkbox' label CheckboxConfig {..} = do
   cb <- holdDyn _initialValue onChangeEvent
   enabled <- holdDyn _initialEnabled onEnableStateEvent
   indeterminate <- holdDyn _initialIndeterminate onIndeterminateChangeEvent
-  return (cbEl, Checkbox
+  return (cbEl, CheckboxResult
     { _value = cb
     , _change = onChangeEvent
     , _enabled = enabled

@@ -1,4 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields    #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE Rank2Types               #-}
 {-# LANGUAGE TemplateHaskell          #-}
@@ -7,7 +9,7 @@
 module Reflex.Dom.SemanticUI.RadioGroup
   (
   -- * Radio Group
-    radioGroup
+    RadioGroup (..)
   , RadioGroupConfig (..)
   -- * Radio Item
   , RadioItem (..)
@@ -51,10 +53,10 @@ instance Default RadioItemConfig where
     , _divAttributes = mempty
     }
 
-data RadioItem t m a = RadioItem
+data RadioItem a = RadioItem
   { _value :: a
   -- ^ Item value
-  , _label :: m ()
+  , _label :: Text
   -- ^ Widget inside the \<label\> element
   , _config :: RadioItemConfig
   -- ^ Item config
@@ -63,28 +65,38 @@ data RadioItem t m a = RadioItem
 --------------------------------------------------------------------------------
 -- Radio Group Config
 
-data RadioGroupConfig t m a = RadioGroupConfig
+data RadioGroupConfig t a = RadioGroupConfig
   { _initialValue :: Maybe a
   -- ^ Initial value of the radio group. 'Nothing' means no items are selected.
   , _setValue :: Event t (Maybe a)
   -- ^ Event which sets the value. 'Nothing' clears the selection.
   , _types :: [CheckboxType]
   -- ^ Checkbox type (e.g. slider)
-  , _wrapper :: m DOM.Element -> m DOM.Element
+  --, _wrapper :: m DOM.Element -> m DOM.Element
   --, _wrapper :: forall b. m b -> m b
   -- ^ Wrapper around each individual item
   }
 
-instance MonadWidget t m => Default (RadioGroupConfig t m a) where
+instance Reflex t => Default (RadioGroupConfig t a) where
   def = RadioGroupConfig
     { _initialValue = Nothing
     , _setValue = never
     , _types = mempty
-    , _wrapper = divClass "field"
+    --, _wrapper = divClass "field"
     }
 
 --------------------------------------------------------------------------------
 -- Radio Group Functions
+
+data RadioGroup t a = RadioGroup
+  { _name :: Text
+  , _items :: [RadioItem a]
+  , _config :: RadioGroupConfig t a
+  }
+
+instance Eq a => UI t (RadioGroup t a) where
+  type Return t (RadioGroup t a) = Dynamic t (Maybe a)
+  ui (RadioGroup name items config) = radioGroup name items config
 
 -- | Create a group of radio checkboxes from the given list of items. The name
 -- is required to link the individual checkboxes together, it must be unique to
@@ -95,14 +107,14 @@ instance MonadWidget t m => Default (RadioGroupConfig t m a) where
 radioGroup
   :: (Eq a, MonadWidget t m)
   => Text                   -- ^ Name of \<input\> elements
-  -> [RadioItem t m a]      -- ^ Items
-  -> RadioGroupConfig t m a -- ^ Group config
+  -> [RadioItem a]      -- ^ Items
+  -> RadioGroupConfig t a -- ^ Group config
   -> m (Dynamic t (Maybe a))
 radioGroup name items config = divClass "grouped fields" $ do
 
   -- Insert all of the items, collecting the raw elements and wrapping them with
   -- the given wrapper function
-  inputEls <- traverse wrapper . imap (putRadioItem name classes) $ items
+  inputEls <- traverse (divClass "field") . imap (putRadioItem name classes) $ items
 
   -- Helper to lookup the index of an item
   let getIndex v = L.findIndex ((==) v . _value) items
@@ -126,13 +138,12 @@ radioGroup name items config = divClass "grouped fields" $ do
 
   where
     initialValue = _initialValue config
-    wrapper = _wrapper config
     cbType = _types config
     hasRadio = if isToggleOrSlider cbType then [] else ["radio"]
     classes = T.unwords $ "ui checkbox" : hasRadio ++ map uiText cbType
     -- Detect clashing classes: toggle and slider take precedence over radio
     isToggleOrSlider types = isJust $
-      L.find (\i -> i == CbToggle || i == CbSlider) types
+      L.find (\i -> i == Toggle || i == Slider) types
 
 -- | Make an individual radio checkbox item.
 putRadioItem
@@ -140,14 +151,14 @@ putRadioItem
   => Text                 -- ^ HTML name attribute
   -> Text                 -- ^ Classes for the enclosing \<div\> element
   -> Int                  -- ^ Value of item
-  -> RadioItem t m a  -- ^ Item configuration
+  -> RadioItem a  -- ^ Item configuration
   -> m DOM.Element
 putRadioItem name classes i (RadioItem _ label (RadioItemConfig attrs' divAttrs')) = do
 
   -- Make the radio item
   (cbEl, inputEl) <- elAttr' "div" divAttrs $ do
     (inputEl, _) <- elAttr' "input" attrs blank
-    void $ el "label" label
+    el "label" $ text label
     return inputEl
 
   -- Setup radio checkbox element with semantic ui

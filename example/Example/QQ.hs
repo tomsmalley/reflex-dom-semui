@@ -134,7 +134,7 @@ toggleUI' element = do
 
 -- | Toggle button in the form of a plus/minus icon. Is 'True' when displaying a
 -- minus, 'False' when displaying a plus.
-toggleUI :: (UI t m a, MonadWidget t m, Return t m a ~ Event t b) => (Bool -> a) -> m (Dynamic t Bool)
+toggleUI :: (UI t a, MonadWidget t m, Return t a ~ Event t b) => (Bool -> a) -> m (Dynamic t Bool)
 toggleUI element = do
   rec
     updateEvent <- dyn $ ui . element <$> showing

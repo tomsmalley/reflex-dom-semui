@@ -1,6 +1,9 @@
 {-# LANGUAGE DeriveFunctor            #-}
+{-# LANGUAGE DuplicateRecordFields    #-}
 {-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE TemplateHaskell          #-}
 
@@ -10,7 +13,7 @@ module Reflex.Dom.SemanticUI.Dropdown
   , uiDropdown
   , uiDropdownMulti
   , DropdownConfig (..)
-  , DropdownItemConfig (..)
+  , DropdownItemConfig' (..)
   , DropdownOptFlag (..)
 
   ) where
@@ -32,13 +35,13 @@ import           Text.Read (readMaybe)
 import           Reflex
 --import           Reflex.Host.Class
 import           Reflex.Dom.Core hiding
-  ( DropdownConfig (..) )
+  ( Dropdown (..), DropdownConfig (..) )
 ------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Common
 ------------------------------------------------------------------------------
 
 -- | Custom Dropdown item configuration
-data DropdownItemConfig m = DropdownItemConfig
+data DropdownItemConfig' m = DropdownItemConfig'
   { dataText :: T.Text
     -- ^ dataText (shown for the selected item)
   , internal :: m ()
@@ -121,15 +124,65 @@ instance (Reflex t) => Default (DropdownConfig t [a]) where
     }
 
 -- | Helper function
-indexToItem :: [(a, DropdownItemConfig m)] -> Text -> Maybe a
+indexToItem :: [DropdownItem a] -> Text -> Maybe a
 indexToItem items i' = do
   i <- readMaybe $ T.unpack i'
+  _value <$> items !? i
+
+-- | Helper function
+indexToItem' :: [(a, DropdownItemConfig' m)] -> Text -> Maybe a
+indexToItem' items i' = do
+  i <- readMaybe $ T.unpack i'
   fst <$> items !? i
+
+-- | Custom Dropdown item configuration
+data DropdownItemConfig = DropdownItemConfig
+--  { dataText :: T.Text
+--    -- ^ dataText (shown for the selected item)
+--  , _
+--  }
+
+data DropdownItem a = DropdownItem
+  { _value :: a
+  , _label :: Text
+  , _config :: DropdownItemConfig
+  }
+
+data Dropdown t a = Dropdown
+  { _items :: [DropdownItem a]
+  , _config :: DropdownConfig t (Maybe a)
+  }
+
+data DropdownMulti t a = DropdownMulti
+  { _items :: [DropdownItem a]
+  , _config :: DropdownConfig t [a]
+  }
+
+instance Eq a => UI t (Dropdown t a) where
+  type Return t (Dropdown t a) = Dynamic t (Maybe a)
+  ui (Dropdown items config) = do
+    (divEl, evt) <- dropdownInternal (undefined :: [(a, DropdownItemConfig' m)]) [] False (void config)
+
+    let setDropdown = liftJSM . dropdownSetExactly (_element_raw divEl)
+                    . getIndices
+
+    -- setValue events
+    performEvent_ $ setDropdown <$> _setValue config
+
+    -- Set initial value
+    pb <- getPostBuild
+    performEvent_ $ setDropdown (_initialValue config) <$ pb
+
+    holdDyn Nothing $ indexToItem items <$> evt
+
+    where
+      getIndices :: Foldable f => f a -> [Int]
+      getIndices vs = L.findIndices ((`elem` vs) . _value) items
 
 -- | Semantic-UI dropdown with static items
 uiDropdown
   :: (MonadWidget t m, Eq a)
-  => [(a, DropdownItemConfig m)]  -- ^ Items
+  => [(a, DropdownItemConfig' m)]  -- ^ Items
   -> [DropdownOptFlag]            -- ^ Options
   -> DropdownConfig t (Maybe a)     -- ^ Dropdown config
   -> m (Dynamic t (Maybe a))
@@ -146,7 +199,7 @@ uiDropdown items options config = do
   pb <- getPostBuild
   performEvent_ $ setDropdown initialValue <$ pb
 
-  holdDyn Nothing $ indexToItem items <$> evt
+  holdDyn Nothing $ indexToItem' items <$> evt
 
   where
     initialValue = _initialValue config
@@ -155,7 +208,7 @@ uiDropdown items options config = do
 -- | Semantic-UI dropdown with multiple static items
 uiDropdownMulti
   :: (MonadWidget t m, Eq a)
-  => [(a, DropdownItemConfig m)]  -- ^ Items
+  => [(a, DropdownItemConfig' m)]  -- ^ Items
   -> [DropdownOptFlag]            -- ^ Options
   -> DropdownConfig t [a]           -- ^ Dropdown config
   -> m (Dynamic t [a])
@@ -172,7 +225,7 @@ uiDropdownMulti items options config = do
   pb <- getPostBuild
   performEvent_ $ setDropdown initialValue <$ pb
 
-  holdDyn [] $ catMaybes . map (indexToItem items) . T.splitOn "," <$> evt
+  holdDyn [] $ catMaybes . map (indexToItem' items) . T.splitOn "," <$> evt
 
   where
     initialValue = _initialValue config
@@ -181,7 +234,7 @@ uiDropdownMulti items options config = do
 -- | Internal function with shared behaviour
 dropdownInternal
   :: (MonadWidget t m, Eq a)
-  => [(a, DropdownItemConfig m)]  -- ^ Items
+  => [(a, DropdownItemConfig' m)]  -- ^ Items
   -> [DropdownOptFlag]            -- ^ Options
   -> Bool                         -- ^ Is multiple dropdown
   -> DropdownConfig t ()            -- ^ Dropdown config
@@ -221,5 +274,5 @@ dropdownInternal items options isMulti config = do
     itemDiv i a = elAttr "div"
       ("class" =: "item" <> "data-value" =: tshow i <> a)
     putItem i (_, conf) = case conf of
-      DropdownItemConfig "" m -> itemDiv i mempty m
-      DropdownItemConfig t m -> itemDiv i ("data-text" =: t) m
+      DropdownItemConfig' "" m -> itemDiv i mempty m
+      DropdownItemConfig' t m -> itemDiv i ("data-text" =: t) m

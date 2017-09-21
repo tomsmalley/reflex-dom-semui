@@ -15,6 +15,7 @@ import Reflex.Dom.SemanticUI.RadioGroup
 import Reflex.Dom.SemanticUI.Icon
 
 $(makeFieldsNoPrefix ''Checkbox)
+$(makeFieldsNoPrefix ''CheckboxResult)
 $(makeFieldsNoPrefix ''CheckboxConfig)
 $(makeFieldsNoPrefix ''Dropdown)
 $(makeFieldsNoPrefix ''DropdownConfig)

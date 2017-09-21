@@ -5,6 +5,8 @@
 {-# LANGUAGE Rank2Types        #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE MonoLocalBinds   #-}
 
 module Example (example) where
 
@@ -86,7 +88,7 @@ section heading child = do
 --    & id ?~ T.toLower heading
   child
 
-checkboxes :: MonadWidget t m => m ()
+checkboxes :: forall t m. MonadWidget t m => m ()
 checkboxes = section "Checkbox" $ do
 
   elAttr "a" ("id" =: "checkbox" <> "class" =: "anchor") blank
@@ -98,16 +100,16 @@ checkboxes = section "Checkbox" $ do
         exampleCardDyn id "Checkbox" "Standard checkbox styles" $ [mkExample|
         \resetEvent -> do
           normal <- divClass "ui compact segment"
-            $ checkbox (text "Normal checkbox")
+            $ ui $ Checkbox "Normal checkbox"
             $ def & setValue .~ (Unchecked <$ resetEvent)
           toggle <- divClass "ui compact segment"
-            $ checkbox (text "Toggle checkbox (checked by default)")
-            $ def & types .~ [CbToggle]
+            $ ui $ Checkbox "Toggle checkbox (checked by default)"
+            $ def & types .~ [Toggle]
                   & setValue .~ (Checked <$ resetEvent)
                   & initialValue .~ Checked
           slider <- divClass "ui compact segment"
-            $ checkbox (text "Slider checkbox")
-            $ def & types .~ [CbSlider]
+            $ ui $ Checkbox "Slider checkbox"
+            $ def & types .~ [Slider]
                   & setValue .~ (Unchecked <$ resetEvent)
           return $ traverse (view value) [normal, toggle, slider]
         |]
@@ -119,13 +121,13 @@ checkboxes = section "Checkbox" $ do
           disable <- uiButton (custom "right attached" <$> def) $ text "Disable"
           let enableEvent = leftmost [Enabled <$ enable, Disabled <$ disable]
           normal <- divClass "ui segment"
-            $ checkbox (text "Initially disabled")
+            $ ui $ Checkbox "Initially disabled"
             $ def & setValue .~ (Unchecked <$ resetEvent)
                   & initialEnabled .~ Disabled
                   & setEnabled .~ leftmost [enableEvent, Disabled <$ resetEvent]
           toggle <- divClass "ui segment"
-            $ checkbox (text "Initially disabled (checked by default)")
-            $ def & types .~ [CbToggle]
+            $ ui $ Checkbox "Initially disabled (checked by default)"
+            $ def & types .~ [Toggle]
                   & setValue .~ (Checked <$ resetEvent)
                   & initialEnabled .~ Disabled
                   & initialValue .~ Checked
@@ -142,7 +144,7 @@ checkboxes = section "Checkbox" $ do
           determinateButton <- uiButton (custom "right attached" <$> def) $ text "Determinate"
           let indeterminateEvent = leftmost [Indeterminate <$ indeterminateButton, Determinate <$ determinateButton]
           cb <- divClass "ui compact segment"
-            $ checkbox (text "Indeterminate")
+            $ ui $ Checkbox "Indeterminate"
             $ def & types .~ []
                   & setValue .~ (Checked <$ resetEvent)
                   & initialIndeterminate .~ Indeterminate
@@ -155,16 +157,16 @@ checkboxes = section "Checkbox" $ do
         exampleCardDyn id "Fitted checkbox" "A fitted checkbox does not leave padding for a label" [mkExample|
         \resetEvent -> do
           normal <- divClass "ui compact segment"
-            $ checkbox blank
-            $ def & types .~ [CbFitted]
+            $ ui $ Checkbox ""
+            $ def & types .~ [Fitted]
                   & setValue .~ (Unchecked <$ resetEvent)
           slider <- divClass "ui compact segment"
-            $ checkbox blank
-            $ def & types .~ [CbFitted, CbToggle]
+            $ ui $ Checkbox ""
+            $ def & types .~ [Fitted, Toggle]
                   & setValue .~ (Unchecked <$ resetEvent)
           toggle <- divClass "ui compact segment"
-            $ checkbox blank
-            $ def & types .~ [CbFitted, CbSlider]
+            $ ui $ Checkbox ""
+            $ def & types .~ [Fitted, Slider]
                   & setValue .~ (Unchecked <$ resetEvent)
           return $ traverse (view value) [normal, slider, toggle]
         |]
@@ -176,13 +178,13 @@ dropdowns = section "Dropdown" $ do
 
   elAttr "a" ("id" =: "dropdown" <> "class" =: "ui anchor") blank
 
-  let makeContact x = (x, DropdownItemConfig (tshow x) $ renderContact x)
+  let makeContact x = (x, DropdownItemConfig' (tshow x) $ renderContact x)
       contacts = map makeContact [minBound..maxBound]
-      makeCard x = (x, DropdownItemConfig "" $ renderCard x)
+      makeCard x = (x, DropdownItemConfig' "" $ renderCard x)
       cards = map makeCard [minBound..maxBound]
-      makeState x = (x, DropdownItemConfig "" $ text $ showState x)
+      makeState x = (x, DropdownItemConfig' "" $ text $ showState x)
       states = map makeState [minBound..maxBound]
-      makeCountry x = (x, DropdownItemConfig "" $ renderCountry x)
+      makeCountry x = (x, DropdownItemConfig' "" $ renderCountry x)
       countries = map makeCountry [minBound..maxBound]
 
   divClass "ui two column stackable grid" $ do
@@ -252,21 +254,21 @@ radioGroups = section "Radio Group" $ do
       divClass "column" $ do
         exampleCardDyn id "Radio group" "" [mkExample|
         \resetEvent -> do
-          let mkRadioItem x = RadioItem x (text $ showFreq x) def
+          let mkRadioItem x = RadioItem x (showFreq x) def
               freqencies = map mkRadioItem [minBound..maxBound]
-          divClass "ui form" $ radioGroup "frequency" freqencies $
+          divClass "ui form" $ ui $ RadioGroup "frequency" freqencies $
             def & setValue .~ (Nothing <$ resetEvent)
         |]
 
       divClass "column" $ do
         exampleCardDyn id "Slider group" "" [mkExample|
         \resetEvent -> do
-          let mkRadioItem x = RadioItem x (text $ T.pack $ show x) def
+          let mkRadioItem x = RadioItem x (T.pack $ show x) def
               throughputs = mkRadioItem <$> [Metered 20, Metered 10, Metered 5, Unmetered]
-          divClass "ui form" $ radioGroup "throughput" throughputs $
+          divClass "ui form" $ ui $ RadioGroup "throughput" throughputs $
             def & initialValue ?~ Unmetered
                 & setValue .~ (Just Unmetered <$ resetEvent)
-                & types .~ [CbSlider]
+                & types .~ [Slider]
         |]
 
   return ()
@@ -329,7 +331,8 @@ exampleCard headerText subtitle (code, widget) = divClass "ui fluid card" $ do
     codeEl False = blank
     codeEl True = divClass "content" $ hscode code
 
-exampleCardDyn :: (Show a, MonadWidget t m) => (b -> Dynamic t a) -> Text -> Text
+exampleCardDyn :: (Show a, MonadWidget t m)
+               => (b -> Dynamic t a) -> Text -> Text
                -> (String, Event t () -> m b) -> m (Dynamic t a)
 exampleCardDyn getDyn headerText subtitle (code, widget) = divClass "ui fluid card" $ do
   (isOpen, resetEvent) <- divClass "content" $ do

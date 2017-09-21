@@ -51,8 +51,8 @@ data ImageRounded = Rounded | Circular deriving (Eq, Show)
 imageRounded :: ImageRounded -> Text
 imageRounded = T.toLower . T.pack . show
 
-instance UI t m Image where
-  type Return t m Image = ()
+instance UI t Image where
+  type Return t Image = ()
   ui (Image src ImageConfig {..}) = elAttr "img" attrs blank
     where
       attrs = "src" =: src <> "class" =: T.unwords classes
@@ -112,8 +112,8 @@ data Header = Header
   , _config :: HeaderConfig
   }
 
-instance UI t m Header where
-  type Return t m Header = ()
+instance UI t Header where
+  type Return t Header = ()
   ui (Header size txt config@HeaderConfig {..}) = case _header of
     PageHeader -> elClass (headerSizeEl size) (T.unwords classes) iContent
     ContentHeader -> divClass (T.unwords $ headerSize size : classes) iContent

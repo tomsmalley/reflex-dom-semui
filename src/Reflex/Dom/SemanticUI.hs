@@ -38,7 +38,7 @@ import Reflex.Dom.Core hiding
   ( checkbox, Checkbox (..), checkbox_value, checkbox_change
   , CheckboxConfig (..), checkboxConfig_attributes, checkboxConfig_setValue
   , HasSetValue (..), HasValue (..), HasAttributes (..)
-  , DropdownConfig (..), dropdown_change, dropdown_value
+  , Dropdown (..), DropdownConfig (..), dropdown_change, dropdown_value
   , link
   )
 import Language.Javascript.JSaddle (JSM)

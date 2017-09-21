@@ -19,12 +19,32 @@
   padding-top: 2.5em;
 }
 
+@media only screen and (max-width: 1272px) {
+  #main.container {
+    margin-right: 318px !important;
+  }
+  #main.container > .right.rail {
+    padding-left: 1.5em;
+    width: 260px;
+  }
+}
+@media only screen and (max-width: 992px) {
+  #main.container > .right.rail {
+    display: none;
+  }
+  #main.container , #masthead > .container {
+    margin-left: 1em !important;
+    margin-right: 1em !important;
+    max-width: none !important;
+  }
+}
+
 #main.container .card {
 }
 
 .haskell pre {
   color: #bbbbbb;
-  font-family: Menlo, monospace;
+  font-family: "Monaco","Menlo","Ubuntu Mono","Consolas","source-code-pro",monospace;
   font-size: 12px;
   overflow: auto;
   margin: 0;
