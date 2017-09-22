@@ -5,8 +5,6 @@
 {-# LANGUAGE Rank2Types        #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE MonoLocalBinds   #-}
 
 module Example (example) where
 
@@ -176,6 +174,8 @@ checkboxes = section "Checkbox" $ do
 dropdowns :: MonadWidget t m => m ()
 dropdowns = section "Dropdown" $ do
 
+
+
   elAttr "a" ("id" =: "dropdown" <> "class" =: "ui anchor") blank
 
   let makeContact x = (x, DropdownItemConfig' (tshow x) $ renderContact x)
@@ -243,8 +243,32 @@ dropdowns = section "Dropdown" $ do
 
   return ()
 
+menu :: MonadWidget t m => m ()
+menu = section "Menu" $ do
+
+  $(printDefinition ''Menu)
+  $(printDefinition ''MenuConfig)
+  $(printDefinition ''MenuItem)
+
+  exampleCardDyn id "Menu" "" [mkExample|
+  \resetEvent -> do
+    addItem <- uiButton def $ text "Add inbox item"
+    items <- count addItem
+    ui $ Menu [ MenuItem ("Inbox" :: Text) $ (\cnt -> text "Inbox" >> divClass "ui teal left pointing label" (text $ tshow cnt)) <$> items
+              , MenuItem ("Spam" :: Text) $ constDyn $ text "Spam" >> divClass "ui label" (text "51")
+              , MenuItem ("Updates" :: Text) $ constDyn $ text "Updates" >> divClass "ui label" (text "1")
+              ] def
+  |]
+
+  return ()
+
 radioGroups :: forall t m. MonadWidget t m => m ()
 radioGroups = section "Radio Group" $ do
+
+  $(printDefinition ''RadioGroup)
+--  $(printDefinition ''RadioGroupConfig)
+--  $(printDefinition ''RadioItem)
+--  $(printDefinition ''RadioItemConfig)
 
   elAttr "a" ("id" =: "radio-group" <> "class" =: "ui anchor") blank
 
@@ -371,6 +395,7 @@ example = semanticMainWithCss hscolourCss $ do
           divClass "item" $ text "Dropdown"
           divClass "item" $ text "Radio Group"
 
+    menu
     checkboxes
     dropdowns
     radioGroups

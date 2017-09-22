@@ -7,9 +7,9 @@
 module Example.QQ where
 
 import Language.Haskell.TH (ExpQ, stringE, reify, pprint)
-import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Syntax (Name)
 import Language.Haskell.TH.Quote
-import Language.Haskell.Exts (parseDecl, prettyPrint, fromParseResult)
+import Language.Haskell.Exts hiding (parseExp, Name)
 -- For parsing the haskell strings to template-haskell AST
 import Language.Haskell.Meta
 import Language.Haskell.Meta.Utils
@@ -32,7 +32,11 @@ import Debug.Trace
 printDefinition :: Name -> ExpQ
 printDefinition name = do
   info <- reify name
-  let pp = prettyPrint . fromParseResult . parseDecl . stripModules $ pprint info
+  let mode = defaultParseMode
+        { baseLanguage = Haskell2010
+        , extensions = [EnableExtension TypeFamilies]
+        }
+      pp = prettyPrint . fromParseResult . parseDeclWithMode mode . stripModules $ pprint info
   [|hscode pp|]
 
 hscode :: MonadWidget t m => String -> m ()

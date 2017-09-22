@@ -100,6 +100,8 @@ data DropdownConfig t a = DropdownConfig
   , _maxSelections :: Maybe Int
   , _useLabels :: Bool
   , _fullTextSearch :: Bool
+  , _searchable :: Bool
+  , _fluid :: Bool
   } deriving Functor
 
 instance (Reflex t) => Default (DropdownConfig t (Maybe a)) where
