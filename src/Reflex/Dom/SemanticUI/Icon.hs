@@ -62,8 +62,8 @@ labelConfigClasses LabelConfig {..} = catMaybes
   [ combineAttached _vAttached _hAttached
   ]
 
-instance UI t Label where
-  type Return t Label = Event t ()
+instance UI t m Label where
+  type Return t m Label = Event t ()
 
   ui (Label txt config@LabelConfig {..}) = do
     (e, _) <- elAttr' elType ("class" =: T.unwords classes) $ text txt
@@ -140,8 +140,8 @@ instance Default IconsConfig where
 --    = elAttr "i" ("class" =: T.unwords classes) $ mapM_ ui icons
 --      where classes = "icons" : maybe [] (pure . uiTextSize) _size
 
-instance UI t Icon where
-  type Return t Icon = Event t ()
+instance UI t m Icon where
+  type Return t m Icon = Event t ()
 
   ui (Icon icon config@IconConfig {..}) = do
     (e, _) <- elAttr' "i" ("class" =: T.unwords classes <> mtitle) blank

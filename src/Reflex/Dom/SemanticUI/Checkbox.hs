@@ -115,8 +115,8 @@ data Checkbox t = Checkbox
   , _config :: CheckboxConfig t
   }
 
-instance UI t (Checkbox t) where
-  type Return t (Checkbox t) = CheckboxResult t
+instance UI t m (Checkbox t) where
+  type Return t m (Checkbox t) = CheckboxResult t
   ui' (Checkbox label config) = checkbox' (text label) config
 
 --------------------------------------------------------------------------------

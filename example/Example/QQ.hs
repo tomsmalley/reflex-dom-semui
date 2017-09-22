@@ -90,7 +90,7 @@ exampleWrapperDyn code widget = divClass "ui card" $ do
       return (isOpen, widgetResult)
   void $ dyn $ codeEl <$> isOpen
   divClass "extra content" $ do
-    ui $ Header H5 "Value" def
+    ui $ Header H5 (text "Value") def
     dyn $ hscodeInline . show <$> widgetResult
   return widgetResult
   where
@@ -134,7 +134,7 @@ toggleUI' element = do
 
 -- | Toggle button in the form of a plus/minus icon. Is 'True' when displaying a
 -- minus, 'False' when displaying a plus.
-toggleUI :: (UI t a, MonadWidget t m, Return t a ~ Event t b) => (Bool -> a) -> m (Dynamic t Bool)
+toggleUI :: (UI t m a, MonadWidget t m, Return t m a ~ Event t b) => (Bool -> a) -> m (Dynamic t Bool)
 toggleUI element = do
   rec
     updateEvent <- dyn $ ui . element <$> showing

@@ -2,8 +2,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Reflex.Dom.SemanticUI.Header where
 
@@ -28,7 +30,8 @@ import           Reflex.Dom.Core hiding
 import Debug.Trace
 
 import Reflex.Dom.SemanticUI.Icon
-import Reflex.Dom.SemanticUI.Common (jQuery, UiClassText(..), consoleLog, Size(..), UI (..), Floated(..))
+import Reflex.Dom.SemanticUI.Common (jQuery, UiClassText(..), consoleLog, Size(..), UI (..), Floated(..)
+  )
 
 data ImageConfig = ImageConfig
   { _size :: Maybe Size
@@ -51,8 +54,8 @@ data ImageRounded = Rounded | Circular deriving (Eq, Show)
 imageRounded :: ImageRounded -> Text
 imageRounded = T.toLower . T.pack . show
 
-instance UI t Image where
-  type Return t Image = ()
+instance UI t m Image where
+  type Return t m Image = ()
   ui (Image src ImageConfig {..}) = elAttr "img" attrs blank
     where
       attrs = "src" =: src <> "class" =: T.unwords classes
@@ -60,16 +63,16 @@ instance UI t Image where
       imgSizeClass = maybe id ((:) . uiText) _size
       imgRoundedClass = maybe id ((:) . imageRounded) _rounded
 
-data HeaderConfig = HeaderConfig
+data HeaderConfig m = HeaderConfig
   { _image :: Maybe Image
   , _icon :: Maybe Icon
-  , _subHeader :: Maybe Text
+  , _subHeader :: Maybe (m ())
   , _header :: HeaderType
   , _dividing :: Bool
   , _floated :: Maybe Floated
   }
 
-instance Default HeaderConfig where
+instance Default (HeaderConfig m) where
   def = HeaderConfig
     { _image = Nothing
     , _icon = Nothing
@@ -79,7 +82,7 @@ instance Default HeaderConfig where
     , _floated = Nothing
     }
 
-headerConfigClasses :: HeaderConfig -> [Text]
+headerConfigClasses :: HeaderConfig m -> [Text]
 headerConfigClasses HeaderConfig {..} = catMaybes
   [ justWhen _dividing "dividing"
   , uiText <$> _floated
@@ -106,15 +109,23 @@ headerSize H5 = "tiny"
 -- | Create a header.
 --
 -- https://semantic-ui.com/elements/header.html
-data Header = Header
+data Header m a = Header
   { _size :: HeaderSize
-  , _text :: Text
-  , _config :: HeaderConfig
+  , _content :: m a
+  , _config :: HeaderConfig m
   }
 
-instance UI t Header where
-  type Return t Header = ()
-  ui (Header size txt config@HeaderConfig {..}) = case _header of
+type Href = Text
+data Anchor m a = Anchor Href (m a)
+instance m ~ m' => UI t m' (Anchor m a) where
+  type Return t m' (Anchor m a) = (Event t (), a)
+  ui (Anchor href inner) = do
+    (a, b) <- elAttr' "a" ("href" =: href <> "class" =: "ui anchor") inner
+    return (domEvent Click a, b)
+
+instance m ~ m' => UI t m' (Header m a) where
+  type Return t m' (Header m a) = a
+  ui (Header size widget config@HeaderConfig {..}) = case _header of
     PageHeader -> elClass (headerSizeEl size) (T.unwords classes) iContent
     ContentHeader -> divClass (T.unwords $ headerSize size : classes) iContent
     where
@@ -126,6 +137,7 @@ instance UI t Header where
         | otherwise = content
       content
         | Just sub <- _subHeader = divClass "content" $ do
-            text txt
-            divClass "sub header" $ text sub
-        | otherwise = text txt
+            a <- widget
+            divClass "sub header" sub
+            return a
+        | otherwise = widget

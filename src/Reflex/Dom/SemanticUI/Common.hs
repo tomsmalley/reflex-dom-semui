@@ -63,11 +63,11 @@ imap f = go 0
 
 ------------------------------------------------------------------------------
 
-class UI t a where
-  type Return t a
-  ui :: MonadWidget t m => a -> m (Return t a)
+class UI t m a where
+  type Return t m a
+  ui :: MonadWidget t m => a -> m (Return t m a)
   ui = fmap snd . ui'
-  ui' :: MonadWidget t m => a -> m (El t, Return t a)
+  ui' :: MonadWidget t m => a -> m (El t, Return t m a)
 
 data Floated = LeftFloated | RightFloated deriving (Eq, Show)
 

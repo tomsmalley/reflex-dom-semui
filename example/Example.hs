@@ -83,7 +83,7 @@ renderCard card = do
 
 section :: MonadWidget t m => Text -> m () -> m ()
 section heading child = do
-  ui $ Header H2 heading $ def
+  ui $ Header H2 (text heading) $ def
     & dividing .~ True
 --    & id ?~ T.toLower heading
   child
@@ -280,7 +280,7 @@ icons = section "Icon" $ do
   $(printDefinition ''IconConfig)
   $(printDefinition ''IconsConfig)
 
-  ui $ Header H3 "Groups" def
+  ui $ Header H3 (text "Groups") def
 
   divClass "ui equal width stackable grid" $ do
 
@@ -306,7 +306,7 @@ icons = section "Icon" $ do
       divClass "column" $ do
         exampleCard "Corner Icon" "A group of icons can display a smaller corner icon"
           [mkExample|
-        ui $ Header H2 "Add on Twitter" $ def
+        ui $ Header H2 (text "Add on Twitter") $ def
           & icon ?~ Icons
               [ Icon "twitter" def
               , Icon "corner add" $ def & inverted .~ True
@@ -344,7 +344,7 @@ exampleCardDyn getDyn headerText subtitle (code, widget) = divClass "ui fluid ca
     return (isOpen, resetEvent)
   widgetResult <- getDyn <$> divClass "content" (widget resetEvent)
   divClass "extra content" $ do
-    ui $ Header H4 "Value" $ def & header .~ ContentHeader
+    ui $ Header H4 (text "Value") $ def & header .~ ContentHeader
     dyn $ hscodeInline . show <$> widgetResult
   void $ dyn $ codeEl <$> isOpen
   return widgetResult
@@ -358,14 +358,14 @@ example = semanticMainWithCss hscolourCss $ do
     divClass "ui container" $ do
       let semanticLogo = Image "https://semantic-ui.com/images/logo.png" $ def
             & size ?~ Massive & rounded ?~ Rounded
-      ui $ Header H1 "Semantic UI for Reflex Dom" $ def
+      ui $ Header H1 (text "Semantic UI for Reflex Dom") $ def
         & image ?~ semanticLogo
-        & subHeader ?~ "Documentation and examples"
+        & subHeader ?~ text "Documentation and examples"
 
   elAttr "div" ("id" =: "main" <> "class" =: "ui container") $ do
     divClass "ui dividing right rail" $ do
       divClass "ui sticky" $ do -- TODO make sticky work
-        ui $ Header H4 "Menu" def
+        ui $ Header H4 (text "Menu") def
         divClass "ui vertical following fluid accordion text menu" $ do
           divClass "item" $ text "Checkbox"
           divClass "item" $ text "Dropdown"

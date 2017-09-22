@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE UndecidableInstances     #-}
 
 module Reflex.Dom.SemanticUI.Dropdown
   (
@@ -158,9 +159,10 @@ data DropdownMulti t a = DropdownMulti
   , _config :: DropdownConfig t [a]
   }
 
-instance Eq a => UI t (Dropdown t a) where
-  type Return t (Dropdown t a) = Dynamic t (Maybe a)
+instance (t ~ t', Eq a) => UI t' m (Dropdown t a) where
+  type Return t' m (Dropdown t a) = Dynamic t (Maybe a)
   ui (Dropdown items config) = do
+    --(divEl, evt) <- dropdownInternal (undefined :: [(a, DropdownItemConfig' m)]) [] False (void config)
     (divEl, evt) <- dropdownInternal (undefined :: [(a, DropdownItemConfig' m)]) [] False (void config)
 
     let setDropdown = liftJSM . dropdownSetExactly (_element_raw divEl)

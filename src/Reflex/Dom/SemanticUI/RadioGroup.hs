@@ -94,8 +94,8 @@ data RadioGroup t a = RadioGroup
   , _config :: RadioGroupConfig t a
   }
 
-instance Eq a => UI t (RadioGroup t a) where
-  type Return t (RadioGroup t a) = Dynamic t (Maybe a)
+instance Eq a => UI t m (RadioGroup t a) where
+  type Return t m (RadioGroup t a) = Dynamic t (Maybe a)
   ui (RadioGroup name items config) = radioGroup name items config
 
 -- | Create a group of radio checkboxes from the given list of items. The name
