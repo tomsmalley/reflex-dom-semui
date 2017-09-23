@@ -4,13 +4,15 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE Rank2Types        #-}
 {-# LANGUAGE RecursiveDo       #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DataKinds   #-}
 
 module Example (example) where
 
 import GHC.Tuple
 import Control.Lens
-import Control.Monad (void, when)
+import Control.Monad ((<=<), void, when)
 import Control.Monad.Trans (liftIO)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -243,21 +245,54 @@ dropdowns = section "Dropdown" $ do
 
   return ()
 
+m :: (Reflex t, DomBuilder t m, MonadWidget t m) => MMenu t m Text '[ Int, TextInput t, Float ]
+m = flip MMenu def
+  $ MIgnore (divClass "header item" $ text "Messages")
+  . MItem "Inbox" (constDyn $ text "Inbox") def
+  . MItem "Spam" (constDyn $ text "Spam") def
+  . MCapture (2 <$ divClass "item" (text "two"))
+  . MCapture (divClass "item" $ uiTextInput def def)
+  . MItem "Updates" (constDyn $ text "Updates") def
+  . MCapture (3.14 <$ divClass "item" (text "pi"))
+
+m' :: MItems t m Text '[]
+m' = MNil
+
 menu :: MonadWidget t m => m ()
 menu = section "Menu" $ do
+
+  ui m'
+
+  (mresdyn, two `HCons` ti `HCons` pi `HCons` HNil) <- ui m
+  display mresdyn
+  text $ tshow two
+  display $ _textInput_value ti
+  text $ tshow pi
+
+  $(printDefinition ''MMenu)
+  $(printDefinition ''MItems)
 
   $(printDefinition ''Menu)
   $(printDefinition ''MenuConfig)
   $(printDefinition ''MenuItem)
 
-  exampleCardDyn id "Menu" "" [mkExample|
+  exampleCardDyn id "Vertical Menu" "A vertical menu displays elements vertically" [mkExample|
   \resetEvent -> do
-    addItem <- uiButton def $ text "Add inbox item"
-    items <- count addItem
-    ui $ Menu [ MenuItem ("Inbox" :: Text) $ (\cnt -> text "Inbox" >> divClass "ui teal left pointing label" (text $ tshow cnt)) <$> items
-              , MenuItem ("Spam" :: Text) $ constDyn $ text "Spam" >> divClass "ui label" (text "51")
-              , MenuItem ("Updates" :: Text) $ constDyn $ text "Updates" >> divClass "ui label" (text "1")
-              ] def
+    inboxCount <- count <=< uiButton def $ text "Add inbox item"
+    spamCount <- count <=< uiButton def $ text "Add spam item"
+    updatesCount <- count <=< uiButton def $ text "Add updates item"
+    let renderItem label classes count = do
+          text label
+          divClass (T.unwords $ "ui" : "label" : classes) $ text $ T.pack $ show count
+    ui $ Menu
+      [ MenuItem ("Inbox" :: Text)
+          (renderItem "Inbox" ["teal left pointing"] <$> inboxCount)
+          $ def & color ?~ Teal
+      , MenuItem "Spam" (renderItem "Spam" [] <$> spamCount) def
+      , MenuItem "Updates" (renderItem "Updates" [] <$> updatesCount) def
+      ] $ def & setValue .~ (Just "Inbox" <$ resetEvent)
+              & initialValue ?~ "Inbox"
+              & vertical .~ True
   |]
 
   return ()

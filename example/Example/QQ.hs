@@ -34,7 +34,7 @@ printDefinition name = do
   info <- reify name
   let mode = defaultParseMode
         { baseLanguage = Haskell2010
-        , extensions = [EnableExtension TypeFamilies]
+        , extensions = EnableExtension <$> [TypeFamilies, ExistentialQuantification, DataKinds, GADTs]
         }
       pp = prettyPrint . fromParseResult . parseDeclWithMode mode . stripModules $ pprint info
   [|hscode pp|]
