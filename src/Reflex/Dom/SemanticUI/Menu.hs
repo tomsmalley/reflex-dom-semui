@@ -39,19 +39,40 @@ import Reflex.Dom.SemanticUI.Icon
 import Reflex.Dom.SemanticUI.Common
 
 data MenuConfig t a = MenuConfig
-  { _initialValue :: Maybe a
-  , _setValue :: Event t (Maybe a)
+  { _initialValue :: a
+  , _setValue :: Event t a
   , _size :: Maybe Size
   , _vertical :: Bool
+  , _customMenu :: Maybe Text
   }
 
-instance Reflex t => Default (MenuConfig t a) where
+initMenuConfig :: Reflex t => a -> MenuConfig t a
+initMenuConfig a = MenuConfig
+    { _setValue = never
+    , _initialValue = a
+    , _size = Nothing
+    , _vertical = False
+    , _customMenu = Nothing
+    }
+
+instance Reflex t => Default (MenuConfig t (Maybe a)) where
   def = MenuConfig
     { _setValue = never
     , _initialValue = Nothing
     , _size = Nothing
     , _vertical = False
+    , _customMenu = Nothing
     }
+
+instance Reflex t => Default (MenuConfig t (Proxy a)) where
+  def = MenuConfig
+    { _setValue = never
+    , _initialValue = Proxy
+    , _size = Nothing
+    , _vertical = False
+    , _customMenu = Nothing
+    }
+
 
 menuConfigClasses :: MenuConfig t a -> [Text]
 menuConfigClasses MenuConfig {..} = catMaybes
@@ -63,6 +84,7 @@ menuConfigClasses MenuConfig {..} = catMaybes
   , justWhen _vertical "vertical"
 --  , uiText <$> _floated
 --  , uiText <$> _color
+  , _customMenu
   ]
 
 data MenuItemConfig = MenuItemConfig
@@ -85,7 +107,7 @@ data MenuItem t m a
 
 data Menu t m a = Menu
   { _items :: [MenuItem t m a]
-  , _config :: MenuConfig t a
+  , _config :: MenuConfig t (Maybe a)
   }
 
 instance (t' ~ t, m' ~ m, Eq a) => UI t' m' (Menu t m a) where
@@ -105,41 +127,95 @@ instance (t' ~ t, m' ~ m, Eq a) => UI t' m' (Menu t m a) where
           itemClasses mCurrent = M.singleton "class" $ T.unwords
                                $ "item" : menuItemConfigClasses conf ++ if mCurrent == Just value then ["active"] else []
 
+data Proxy a = Proxy
 
-data MItems t m a (l :: [Type]) where
+data MItems t m a (xs :: [Type]) where
+  -- | Empty menu
   MNil :: MItems t m a '[]
-  MItem :: a -> Dynamic t (m ()) -> MenuItemConfig -> MItems t m a l -> MItems t m a l
-  MCapture :: m b -> MItems t m a l -> MItems t m a (b ': l)
-  MIgnore :: m b -> MItems t m a l -> MItems t m a l
+  -- | Normal clickable menu item
+  MItem :: a -> Dynamic t (m ()) -> MenuItemConfig -> MItems t m a xs -> MItems t m a xs
+  -- | Sub widget, capturing the value
+  MCapture :: m b -> MItems t m a xs -> MItems t m a (b ': xs)
+  -- | Sub widget, ignoring the value
+  MIgnore :: m b -> MItems t m a xs -> MItems t m a xs
+  -- | Sub menu
+  MSubMenu :: HListAppend xs ys => MenuConfig t (Proxy a) -> MItems t m a ys -> MItems t m a xs -> MItems t m a (xs `Append` ys)
 
-data MMenu t m a l = MMenu
-  { _items :: MItems t m a '[] -> MItems t m a l
-  , _config :: MenuConfig t a
+type family Append (as :: [Type]) (bs :: [Type]) :: [Type] where
+  Append '[] bs = bs
+  Append as '[] = as
+  Append (a ': as) bs = a ': (Append as bs)
+
+class HListAppend as bs where
+  hlistAppend :: HList as -> HList bs -> HList (Append as bs)
+
+instance HListAppend '[] '[] where
+  hlistAppend HNil HNil = HNil
+instance HListAppend '[] bs where
+  hlistAppend HNil bs = bs
+instance HListAppend as '[] where
+  hlistAppend as HNil = as
+instance (Append (a ': as) bs ~ (a ': Append as bs), HListAppend as bs) => HListAppend (a ': as) bs where
+  hlistAppend (a `HCons` as) bs = a `HCons` hlistAppend as bs
+
+data MMenu t m a xs = MMenu
+  { _items :: MItems t m a xs
+  , _config :: MenuConfig t (Maybe a)
   }
 
-instance (Eq a, m ~ m', t ~ t') => UI t' m' (MMenu t m a l) where
-  type Return t' m' (MMenu t m a l) = (Dynamic t (Maybe a), HList l)
+instance (Ord a, m ~ m', t ~ t') => UI t' m' (MMenu t m a xs) where
+  type Return t' m' (MMenu t m a xs) = (Dynamic t (Maybe a), HList xs)
   ui (MMenu items config@MenuConfig {..}) = divClass (T.unwords classes) $ do
-    (evts, l) <- ui $ items MNil
-    vDyn <- holdDyn _initialValue $ leftmost $ _setValue : (fmap Just <$> evts)
-    return (vDyn, l)
+    rec (evts, xs) <- renderItems items vDyn
+        vDyn <- holdDyn _initialValue $ leftmost $ _setValue : (fmap Just <$> evts)
+    return (vDyn, xs)
     where
       classes = "ui" : "menu" : menuConfigClasses config
 
-instance (Eq a, m ~ m', t ~ t') => UI t' m' (MItems t m a l) where
-  type Return t' m' (MItems t m a l) = ([Event t a], HList l)
-  ui MNil = return ([], HNil)
-  ui (MItem value mkItem conf items) = do
-    evtEl <- dyn $ elDynAttr' "a" (itemClasses <$> constDyn Nothing) <$> mkItem
+data MenuDef t m a xs = MenuDef
+  { _items :: MItems t m a xs
+  , _config :: MenuConfig t a
+  }
+
+instance (Ord a, m ~ m', t ~ t') => UI t' m' (MenuDef t m a xs) where
+  type Return t' m' (MenuDef t m a xs) = (Dynamic t a, HList xs)
+  ui (MenuDef items config@MenuConfig {..}) = divClass (T.unwords classes) $ do
+    rec (evts, xs) <- renderItems items (Just <$> vDyn)
+        vDyn <- holdDyn _initialValue $ leftmost $ _setValue : evts
+    return (vDyn, xs)
+    where
+      classes = "ui" : "menu" : menuConfigClasses config
+
+renderItems :: (Ord a, Reflex t, MonadWidget t m) => MItems t m a xs -> Dynamic t (Maybe a)
+            -> m ([Event t a], HList xs)
+renderItems allItems dynVal = let sel = demux dynVal in renderItems' allItems sel
+
+renderItems' :: (Eq a, MonadWidget t m) => MItems t m a xs -> Demux t (Maybe a)
+            -> m ([Event t a], HList xs)
+renderItems' allItems selected = case allItems of
+
+  MNil -> return ([], HNil)
+
+  MItem value mkItem conf items -> do
+    evtEl <- dyn $ elDynAttr' "a" classes <$> mkItem
     let clickEvt = domEvent Click . fst <$> evtEl
     clickEvt' <- switchPromptly never clickEvt
-    (evts, hlist) <- ui items
+    (evts, hlist) <- renderItems' items selected
     return ((value <$ clickEvt') : evts, hlist)
     where
-      itemClasses mCurrent = M.singleton "class" $ T.unwords
-        $ "item" : menuItemConfigClasses conf ++ if mCurrent == Just value then ["active"] else []
-  ui (MCapture mb items) = do
+      classes = fmap itemClasses $ demuxed selected $ Just value
+      itemClasses isActive = M.singleton "class" $ T.unwords
+        $ "item" : menuItemConfigClasses conf ++ if isActive then ["active"] else []
+
+  MCapture mb items -> do
     b <- mb
-    fmap (HCons b) <$> ui items
-  ui (MIgnore mb items) = mb >> ui items
+    fmap (HCons b) <$> renderItems' items selected
+
+  MIgnore mb items -> mb >> renderItems' items selected
+
+  MSubMenu config sub items -> divClass (T.unwords classes) $ do
+    (subEvents, subList) <- renderItems' sub selected
+    (itemsEvents, itemsList) <- renderItems' items selected
+    return (itemsEvents ++ subEvents, itemsList `hlistAppend` subList)
+      where classes = "menu" : menuConfigClasses config
 

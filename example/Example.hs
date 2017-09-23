@@ -245,29 +245,38 @@ dropdowns = section "Dropdown" $ do
 
   return ()
 
-m :: (Reflex t, DomBuilder t m, MonadWidget t m) => MMenu t m Text '[ Int, TextInput t, Float ]
-m = flip MMenu def
-  $ MIgnore (divClass "header item" $ text "Messages")
-  . MItem "Inbox" (constDyn $ text "Inbox") def
-  . MItem "Spam" (constDyn $ text "Spam") def
-  . MCapture (2 <$ divClass "item" (text "two"))
-  . MCapture (divClass "item" $ uiTextInput def def)
-  . MItem "Updates" (constDyn $ text "Updates") def
-  . MCapture (3.14 <$ divClass "item" (text "pi"))
-
-m' :: MItems t m Text '[]
-m' = MNil
-
 menu :: MonadWidget t m => m ()
 menu = section "Menu" $ do
 
-  ui m'
+  exampleCardDyn id "Secondary Menu" "A menu can adjust its appearance to de-emphasize its contents" [mkExample|
+  \resetEvent -> do
+    (selected, search `HCons` _) <- ui . flip MenuDef (initMenuConfig "Home"
+        & customMenu ?~ "secondary" & setValue .~ ("Home" <$ resetEvent))
+      $ MItem "Home" (constDyn $ text "Home") def
+      $ MItem "Messages" (constDyn $ text "Messages") def
+      $ MItem "Friends" (constDyn $ text "Friends") def
+      $ (MSubMenu (def & customMenu ?~ "right")
+          $ MCapture (divClass "item" $ uiTextInput def def)
+          . MItem "Logout" (constDyn $ text "Logout") def
+          $ MNil)
+      $ MNil
+    return $ (,) <$> selected <*> _textInput_value search
+  |]
 
-  (mresdyn, two `HCons` ti `HCons` pi `HCons` HNil) <- ui m
-  display mresdyn
-  text $ tshow two
-  display $ _textInput_value ti
-  text $ tshow pi
+  exampleCardDyn id "Secondary Menu" "A menu can adjust its appearance to de-emphasize its contents" [mkExample|
+  \resetEvent -> do
+    (selected, search `HCons` _) <- ui . flip MMenu (def
+        & customMenu ?~ "secondary" & setValue .~ (Nothing <$ resetEvent))
+      $ MItem "Home" (constDyn $ text "Home") def
+      $ MItem "Messages" (constDyn $ text "Messages") def
+      $ MItem "Friends" (constDyn $ text "Friends") def
+      $ (MSubMenu (def & customMenu ?~ "right")
+          $ MCapture (divClass "item" $ uiTextInput def def)
+          . MItem "Logout" (constDyn $ text "Logout") def
+          $ MNil)
+      $ MNil
+    return $ (,) <$> selected <*> _textInput_value search
+  |]
 
   $(printDefinition ''MMenu)
   $(printDefinition ''MItems)
