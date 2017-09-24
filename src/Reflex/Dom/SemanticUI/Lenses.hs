@@ -32,7 +32,5 @@ $(makeFieldsNoPrefix ''IconsConfig)
 $(makeFieldsNoPrefix ''HeaderConfig)
 
 $(makeFieldsNoPrefix ''MenuConfig)
-$(makeFieldsNoPrefix ''MenuItem)
 $(makeFieldsNoPrefix ''MenuItemConfig)
-$(makeFieldsNoPrefix ''Menu)
 

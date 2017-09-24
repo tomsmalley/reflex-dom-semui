@@ -14,7 +14,7 @@ import Language.Haskell.Exts hiding (parseExp, Name)
 import Language.Haskell.Meta
 import Language.Haskell.Meta.Utils
 
-import Data.Char (isUpper, isAlpha)
+import Data.Char (isUpper, isAlpha, isAlphaNum, isNumber)
 
 import Language.Haskell.HsColour.Classify (tokenise)
 import Language.Haskell.HsColour.CSS (renderToken)
@@ -29,15 +29,18 @@ import qualified Data.Text as T
 
 import Debug.Trace
 
-printDefinition :: Name -> ExpQ
-printDefinition name = do
+printDefinition :: (String -> String) -> Name -> ExpQ
+printDefinition preproc name = do
   info <- reify name
   let mode = defaultParseMode
         { baseLanguage = Haskell2010
-        , extensions = EnableExtension <$> [TypeFamilies, ExistentialQuantification, DataKinds, GADTs, MultiParamTypeClasses]
+        , extensions = EnableExtension <$> [TypeFamilies, ExplicitForAll, DataKinds, GADTs, MultiParamTypeClasses]
         }
-      pp = prettyPrint . fromParseResult . parseDeclWithMode mode . stripModules $ pprint info
-  [|hscode pp|]
+      style' = style { lineLength = 200, ribbonsPerLine = 1 }
+      pp = prettyPrintStyleMode style' defaultMode . fromParseResult . parseDeclWithMode mode . stripForAll . stripTypes . stripNumbers . stripModules $ pprint info
+      -- silly hack to remove newlines before running preproc
+      pp' = prettyPrintStyleMode style' defaultMode . fromParseResult . parseDeclWithMode mode $ preproc pp
+  [|hscode pp'|]
 
 hscode :: MonadWidget t m => String -> m ()
 hscode = void . elAttr "code" ("class" =: "haskell")
@@ -51,6 +54,22 @@ hscodeInline = void . elAttr "code" ("class" =: "inline haskell")
 hscolour :: String -> Text
 hscolour = T.strip . T.pack . concatMap renderToken . tokenise . unindent
 
+stripForAll :: String -> String
+stripForAll "" = ""
+stripForAll ('f':'o':'r':'a':'l':'l':rest) = stripForAll $ drop 1 $ dropWhile (/= '.') rest
+stripForAll (x:rest) = x : stripForAll rest
+
+-- Breaks stuff
+stripParens :: String -> String
+stripParens "" = ""
+stripParens ('-':'>':' ':'(':rest) = '-':'>':' ': stripParens rest
+stripParens ('=':'>':' ':'(':rest) = '=':'>':' ': stripParens rest
+stripParens (':':':':' ':'(':rest) = ':':':':' ': stripParens rest
+stripParens (')':',':rest) = ',': stripParens rest
+stripParens (')':'}':rest) = '}': stripParens rest
+stripParens (')':' ':'-':'>':rest) = stripParens $ ' ':'-':'>': rest
+stripParens (x:rest) = x : stripParens rest
+
 stripModules :: String -> String
 stripModules "" = ""
 stripModules (c:s)
@@ -58,6 +77,22 @@ stripModules (c:s)
     (_, '.':rest) -> stripModules rest
     (taken, rest) -> taken ++ stripModules rest
   | otherwise = c : stripModules s
+
+stripNumbers :: String -> String
+stripNumbers "" = ""
+stripNumbers (x:'_':a:b:c:rest)
+  | isAlphaNum x && isNumber a && isNumber b && isNumber c = x : stripNumbers rest
+  | isAlphaNum x && isNumber a && isNumber b = x : c : stripNumbers rest
+  | isAlphaNum x && isNumber a = x : b : c : stripNumbers rest
+stripNumbers (x:rest) = x : stripNumbers rest
+
+stripTypes :: String -> String
+stripTypes "" = ""
+stripTypes ('(':t:' ':':':':':' ':rest)
+  | isAlpha t = t:' ': stripTypes (drop 1 $ dropWhile (/= ')') rest)
+stripTypes ('(':t:a:' ':':':':':' ':rest)
+  | isAlpha t && isAlphaNum a = t:a:' ': stripTypes (drop 1 $ dropWhile (/= ')') rest)
+stripTypes (x:rest) = x : stripTypes rest
 
 ex :: QuasiQuoter
 ex = QuasiQuoter

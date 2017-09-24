@@ -250,40 +250,39 @@ menu = section "Menu" $ do
 
   exampleCardDyn id "Secondary Menu" "A menu can adjust its appearance to de-emphasize its contents" [mkExample|
   \resetEvent -> do
-    (selected, search `HCons` _) <- ui . flip MenuDef (initMenuConfig "Home"
-        & customMenu ?~ "secondary" & setValue .~ ("Home" <$ resetEvent))
-      $ MItem "Home" (constDyn $ text "Home") def
-      $ MItem "Messages" (constDyn $ text "Messages") def
-      $ MItem "Friends" (constDyn $ text "Friends") def
-      $ (MSubMenu (def & customMenu ?~ "right")
-          $ MCapture (divClass "item" $ uiTextInput def def)
-          . MItem "Logout" (constDyn $ text "Logout") def
-          $ MNil)
-      $ MNil
+    (selected, search `HCons` _) <- ui $ MenuDef
+      ( MenuItem "Home" (constDyn $ text "Home") def
+      $ MenuItem "Messages" (constDyn $ text "Messages") def
+      $ MenuItem "Friends" (constDyn $ text "Friends") def
+      $ (MenuSub (def & customMenu ?~ "right")
+          $ MenuCapture (divClass "item" $ uiTextInput def def)
+          . MenuItem "Logout" (constDyn $ text "Logout") def
+          $ MenuBase)
+      $ MenuBase
+      ) $ initMenuConfig "Home"
+        & customMenu ?~ "secondary" & setValue .~ ("Home" <$ resetEvent)
     return $ (,) <$> selected <*> _textInput_value search
   |]
 
   exampleCardDyn id "Secondary Menu" "A menu can adjust its appearance to de-emphasize its contents" [mkExample|
   \resetEvent -> do
-    (selected, search `HCons` _) <- ui . flip MMenu (def
-        & customMenu ?~ "secondary" & setValue .~ (Nothing <$ resetEvent))
-      $ MItem "Home" (constDyn $ text "Home") def
-      $ MItem "Messages" (constDyn $ text "Messages") def
-      $ MItem "Friends" (constDyn $ text "Friends") def
-      $ (MSubMenu (def & customMenu ?~ "right")
-          $ MCapture (divClass "item" $ uiTextInput def def)
-          . MItem "Logout" (constDyn $ text "Logout") def
-          $ MNil)
-      $ MNil
+    (selected, search `HCons` _) <- ui $ Menu
+      ( MenuItem "Home" (constDyn $ text "Home") def
+      $ MenuItem "Messages" (constDyn $ text "Messages") def
+      $ MenuItem "Friends" (constDyn $ text "Friends") def
+      $ (MenuSub (def & customMenu ?~ "right")
+          $ MenuCapture (divClass "item" $ uiTextInput def def)
+          . MenuItem "Logout" (constDyn $ text "Logout") def
+          $ MenuBase)
+      $ MenuBase
+      ) $ def & customMenu ?~ "secondary" & setValue .~ (Nothing <$ resetEvent)
     return $ (,) <$> selected <*> _textInput_value search
   |]
 
-  $(printDefinition ''MMenu)
-  $(printDefinition ''MItems)
-
-  $(printDefinition ''Menu)
-  $(printDefinition ''MenuConfig)
-  $(printDefinition ''MenuItem)
+  $(printDefinition stripParens ''Menu)
+  -- $(printDefinition id ''MenuItems)
+  $(printDefinition stripParens ''MenuConfig)
+  $(printDefinition stripParens ''MenuItemConfig)
 
   exampleCardDyn id "Vertical Menu" "A vertical menu displays elements vertically" [mkExample|
   \resetEvent -> do
@@ -293,13 +292,14 @@ menu = section "Menu" $ do
     let renderItem label classes count = do
           text label
           divClass (T.unwords $ "ui" : "label" : classes) $ text $ T.pack $ show count
-    ui $ Menu
-      [ MenuItem ("Inbox" :: Text)
+    fmap fst $ ui $ Menu
+      ( MenuItem "Inbox"
           (renderItem "Inbox" ["teal left pointing"] <$> inboxCount)
-          $ def & color ?~ Teal
-      , MenuItem "Spam" (renderItem "Spam" [] <$> spamCount) def
-      , MenuItem "Updates" (renderItem "Updates" [] <$> updatesCount) def
-      ] $ def & setValue .~ (Just "Inbox" <$ resetEvent)
+          (def & color ?~ Teal)
+      $ MenuItem "Spam" (renderItem "Spam" [] <$> spamCount) def
+      $ MenuItem "Updates" (renderItem "Updates" [] <$> updatesCount) def
+      $ MenuBase
+      ) $ def & setValue .~ (Just "Inbox" <$ resetEvent)
               & initialValue ?~ "Inbox"
               & vertical .~ True
   |]
@@ -309,10 +309,10 @@ menu = section "Menu" $ do
 radioGroups :: forall t m. MonadWidget t m => m ()
 radioGroups = section "Radio Group" $ do
 
-  $(printDefinition ''RadioGroup)
---  $(printDefinition ''RadioGroupConfig)
---  $(printDefinition ''RadioItem)
---  $(printDefinition ''RadioItemConfig)
+  $(printDefinition id ''RadioGroup)
+--  $(printDefinition id ''RadioGroupConfig)
+--  $(printDefinition id ''RadioItem)
+--  $(printDefinition id ''RadioItemConfig)
 
   elAttr "a" ("id" =: "radio-group" <> "class" =: "ui anchor") blank
 
@@ -344,9 +344,9 @@ radioGroups = section "Radio Group" $ do
 icons :: MonadWidget t m => m ()
 icons = section "Icon" $ do
 
-  $(printDefinition ''Icon)
-  $(printDefinition ''IconConfig)
-  $(printDefinition ''IconsConfig)
+  $(printDefinition id ''Icon)
+  $(printDefinition id ''IconConfig)
+  $(printDefinition id ''IconsConfig)
 
   ui $ Header H3 (text "Groups") def
 
