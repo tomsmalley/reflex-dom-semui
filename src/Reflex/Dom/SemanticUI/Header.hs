@@ -30,8 +30,7 @@ import           Reflex.Dom.Core hiding
 import Debug.Trace
 
 import Reflex.Dom.SemanticUI.Icon
-import Reflex.Dom.SemanticUI.Common (jQuery, UiClassText(..), consoleLog, Size(..), UI (..), Floated(..)
-  )
+import Reflex.Dom.SemanticUI.Common
 
 data ImageConfig = ImageConfig
   { _size :: Maybe Size
@@ -70,6 +69,8 @@ data HeaderConfig m = HeaderConfig
   , _header :: HeaderType
   , _dividing :: Bool
   , _floated :: Maybe Floated
+  , _item :: Bool
+  , _component :: Bool -- This is the "ui" (component) class
   }
 
 instance Default (HeaderConfig m) where
@@ -80,11 +81,15 @@ instance Default (HeaderConfig m) where
     , _header = PageHeader
     , _dividing = False
     , _floated = Nothing
+    , _item = False
+    , _component = True
     }
 
 headerConfigClasses :: HeaderConfig m -> [Text]
 headerConfigClasses HeaderConfig {..} = catMaybes
   [ justWhen _dividing "dividing"
+  , justWhen _item "item"
+  , justWhen _component "ui"
   , uiText <$> _floated
   ]
 
@@ -106,6 +111,17 @@ headerSize H3 = "medium"
 headerSize H4 = "small"
 headerSize H5 = "tiny"
 
+data Paragraph = Paragraph
+  { _text :: Text
+  }
+
+instance ToPart Paragraph where
+  toPart = id
+
+instance UI t m Paragraph where
+  type Return t m Paragraph = ()
+  ui (Paragraph txt) = el "p" $ text txt
+
 -- | Create a header.
 --
 -- https://semantic-ui.com/elements/header.html
@@ -114,6 +130,14 @@ data Header m a = Header
   , _content :: m a
   , _config :: HeaderConfig m
   }
+
+instance Item (Header m a) where
+  toItem (Header size content config) = Header size content $
+    config { _item = True, _component = False }
+
+instance ToPart (Header m a) where
+  toPart (Header size content config) = Header size content $
+    config { _component = False }
 
 type Href = Text
 data Anchor m a = Anchor Href (m a)
@@ -129,8 +153,7 @@ instance m ~ m' => UI t m' (Header m a) where
     PageHeader -> elClass (headerSizeEl size) (T.unwords classes) iContent
     ContentHeader -> divClass (T.unwords $ headerSize size : classes) iContent
     where
-      -- TODO: make this like the icons
-      classes = "ui" : "header" : headerConfigClasses config
+      classes = "header" : headerConfigClasses config
       iContent
         | Just img <- _image = ui img >> content
         | Just icon <- _icon = ui icon >> content

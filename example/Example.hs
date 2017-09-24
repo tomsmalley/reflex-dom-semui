@@ -248,6 +248,47 @@ dropdowns = section "Dropdown" $ do
 menu :: MonadWidget t m => m ()
 menu = section "Menu" $ do
 
+  let makeCard x = (x, DropdownItemConfig' "" $ renderCard x)
+      cards = map makeCard [minBound..maxBound]
+
+  exampleCardDyn id "Dropdown Item" "An item may contain a nested menu in a dropdown" [mkExample|
+  \resetEvent -> do
+    fmap fst $ ui $ Menu
+      ( MenuIgnore ( do
+          ui $ Header H4 (text "Promotions") def
+          el "p" $ text "Check out our new promotions"
+        ) (def & link .~ Link "http://haskell.org/")
+      $ MenuIgnore ( do
+          ui $ Header H4 (text "Coupons") def
+          el "p" $ text "Check out our collection of coupons"
+        ) def
+      $ MenuIgnore ( do
+          ui $ Header H4 (text "Rebates") def
+          el "p" $ text "Visit our rebate forum for information on claiming rebates"
+        ) def
+      $ MenuVoid)
+      $ def & vertical .~ True
+  |]
+
+  exampleCardDyn id "Dropdown Item" "An item may contain a nested menu in a dropdown" [mkExample|
+  \resetEvent -> do
+    (selected, dd `HCons` _) <- ui $ Menu
+--      ( MenuDropdown "Categories"
+--        ( MenuItem "Electronics" (constDyn $ text "Electronics") def
+--        $ MenuItem "Automotive" (constDyn $ text "Automotive") def
+--        $ MenuItem "Home" (constDyn $ text "Home") def
+--        $ MenuBase )
+      ( MenuItem 1 (constDyn $ text "One") def
+      $ MenuItem 2 (constDyn $ text "Two") def
+      $ MenuItem 3 (constDyn $ text "Three") def
+      $ MenuCapture ( uiDropdown cards [] $ def & placeholder .~ "Cards" & action .~ Hide & item .~ True ) def
+      $ MenuBase )
+      $ def & vertical .~ True
+            & setValue .~ (Nothing <$ resetEvent)
+    return $ (,) <$> selected <*> dd
+  |]
+
+
   exampleCardDyn id "Secondary Menu" "A menu can adjust its appearance to de-emphasize its contents" [mkExample|
   \resetEvent -> do
     (selected, search `HCons` _) <- ui $ MenuDef
@@ -255,9 +296,10 @@ menu = section "Menu" $ do
       $ MenuItem "Messages" (constDyn $ text "Messages") def
       $ MenuItem "Friends" (constDyn $ text "Friends") def
       $ (MenuSub (def & customMenu ?~ "right")
-          $ MenuCapture (divClass "item" $ uiTextInput def def)
-          . MenuItem "Logout" (constDyn $ text "Logout") def
-          $ MenuBase)
+          ( MenuCapture (divClass "item" $ uiTextInput def def) def
+          $ MenuItem "Logout" (constDyn $ text "Logout") def
+          $ MenuBase )
+        )
       $ MenuBase
       ) $ initMenuConfig "Home"
         & customMenu ?~ "secondary" & setValue .~ ("Home" <$ resetEvent)
@@ -271,7 +313,7 @@ menu = section "Menu" $ do
       $ MenuItem "Messages" (constDyn $ text "Messages") def
       $ MenuItem "Friends" (constDyn $ text "Friends") def
       $ (MenuSub (def & customMenu ?~ "right")
-          $ MenuCapture (divClass "item" $ uiTextInput def def)
+          $ MenuCapture (divClass "item" $ uiTextInput def def) def
           . MenuItem "Logout" (constDyn $ text "Logout") def
           $ MenuBase)
       $ MenuBase
@@ -298,6 +340,7 @@ menu = section "Menu" $ do
           (def & color ?~ Teal)
       $ MenuItem "Spam" (renderItem "Spam" [] <$> spamCount) def
       $ MenuItem "Updates" (renderItem "Updates" [] <$> updatesCount) def
+      $ MenuCapture (uiTextInput (custom "transparent icon" <$> def) def { _textInputConfig_attributes = constDyn $ "placeholder" =: "Search mail..." }) def
       $ MenuBase
       ) $ def & setValue .~ (Just "Inbox" <$ resetEvent)
               & initialValue ?~ "Inbox"

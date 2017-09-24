@@ -69,6 +69,18 @@ class UI t m a where
   ui = fmap snd . ui'
   ui' :: MonadWidget t m => a -> m (El t, Return t m a)
 
+class Item a where
+  toItem :: a -> a
+
+class (ToPart a, UI t m a) => Part t m a where
+  part :: MonadWidget t m => a -> m (Return t m a)
+  part = ui . toPart
+
+instance (ToPart a, UI t m a) => Part t m a where
+
+class ToPart a where
+  toPart :: a -> a
+
 data Floated = LeftFloated | RightFloated deriving (Eq, Show)
 
 instance UiClassText Floated where

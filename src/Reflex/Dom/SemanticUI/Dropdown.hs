@@ -16,6 +16,7 @@ module Reflex.Dom.SemanticUI.Dropdown
   , DropdownConfig (..)
   , DropdownItemConfig' (..)
   , DropdownOptFlag (..)
+  , DropdownAction (..)
 
   ) where
 
@@ -36,7 +37,7 @@ import           Text.Read (readMaybe)
 import           Reflex
 --import           Reflex.Host.Class
 import           Reflex.Dom.Core hiding
-  ( Dropdown (..), DropdownConfig (..) )
+  ( Dropdown (..), DropdownConfig (..), Select )
 ------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Common
 ------------------------------------------------------------------------------
@@ -66,19 +67,34 @@ dropdownClass :: [DropdownOptFlag] -> T.Text
 dropdownClass opts = T.unwords $ "ui" : (flags ++ ["dropdown"])
   where flags = map (T.toLower . T.drop 3 . tshow) $ L.sortOn fromEnum opts
 
+data DropdownAction
+  = Activate
+  | Combo
+  | Select
+  | Hide
+  deriving (Eq, Show)
+
+instance ToJSVal DropdownAction where
+  toJSVal action = valMakeString $ case action of
+    Activate -> "activate"
+    Combo -> "combo"
+    Select -> "select"
+    Hide -> "hide"
+
 ------------------------------------------------------------------------------
 
 -- | Given a div element, tell semantic-ui to convert it to a dropdown with the
 -- given options. The callback function is called on change with the currently
 -- selected value.
-activateDropdown :: DOM.Element -> Maybe Int -> Bool -> Bool
+activateDropdown :: DOM.Element -> Maybe Int -> Bool -> Bool -> DropdownAction
                  -> (Text -> JSM ()) -> JSM ()
-activateDropdown e maxSel useLabels fullText onChange = do
+activateDropdown e maxSel useLabels fullText dropdownAction onChange = do
   o <- obj
   o <# ("forceSelection" :: Text) $ False
   o <# ("maxSelections" :: Text) $ maxSel
   o <# ("useLabels" :: Text) $ useLabels
   o <# ("fullTextSearch" :: Text) $ fullText
+  o <# ("action" :: Text) $ dropdownAction
   o <# ("onChange" :: Text) $ fun $ \_ _ [t, _, _] ->
     onChange =<< fromJSValUnchecked t
   void $ jQuery e ^. js1 ("dropdown" :: Text) o
@@ -102,6 +118,8 @@ data DropdownConfig t a = DropdownConfig
   , _fullTextSearch :: Bool
   , _searchable :: Bool
   , _fluid :: Bool
+  , _action :: DropdownAction
+  , _item :: Bool
   } deriving Functor
 
 instance (Reflex t) => Default (DropdownConfig t (Maybe a)) where
@@ -113,6 +131,10 @@ instance (Reflex t) => Default (DropdownConfig t (Maybe a)) where
     , _maxSelections = Nothing
     , _useLabels = True
     , _fullTextSearch = False
+    , _searchable = False
+    , _fluid = False
+    , _action = Activate
+    , _item = False
     }
 
 instance (Reflex t) => Default (DropdownConfig t [a]) where
@@ -124,6 +146,10 @@ instance (Reflex t) => Default (DropdownConfig t [a]) where
     , _maxSelections = Nothing
     , _useLabels = True
     , _fullTextSearch = False
+    , _searchable = False
+    , _fluid = False
+    , _action = Activate
+    , _item = False
     }
 
 -- | Helper function
@@ -249,7 +275,9 @@ dropdownInternal items options isMulti config = do
 
     -- This holds the placeholder. Initial value must be set by js function in
     -- wrapper.
-    divClass "default text" $ text $ placeholder
+    if action == Activate
+    then divClass "default text" $ text placeholder
+    else text placeholder -- No wrapper if the text doesn't get replaced by the action
     elAttr "i" ("class" =: "dropdown icon") blank
 
     -- Dropdown menu
@@ -259,7 +287,7 @@ dropdownInternal items options isMulti config = do
   (onChangeEvent, onChangeCallback) <- newTriggerEvent
 
   -- Activate the dropdown after element is built
-  let activate = activateDropdown (_element_raw divEl) maxSel useLabels fullText
+  let activate = activateDropdown (_element_raw divEl) maxSel useLabels fullText action
                $ liftIO . onChangeCallback
   pb <- getPostBuild
   performEvent_ $ liftJSM activate <$ pb
@@ -267,6 +295,7 @@ dropdownInternal items options isMulti config = do
   return (divEl, onChangeEvent)
 
   where
+    action = _action config
     useLabels = _useLabels config
     fullText = _fullTextSearch config
     placeholder = _placeholder config
@@ -274,7 +303,8 @@ dropdownInternal items options isMulti config = do
     maxSel = if isMulti then _maxSelections config
                         else Nothing
     multiClass = if isMulti then " multiple" else ""
-    classes = dropdownClass options <> multiClass
+    itemClass = if _item config then " item" else ""
+    classes = dropdownClass options <> multiClass <> itemClass
     itemDiv i a = elAttr "div"
       ("class" =: "item" <> "data-value" =: tshow i <> a)
     putItem i (_, conf) = case conf of
