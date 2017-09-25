@@ -35,13 +35,22 @@ import Reflex.Dom.SemanticUI.Common
 data ImageConfig = ImageConfig
   { _size :: Maybe Size
   , _rounded :: Maybe ImageRounded
+  , _avatar :: Bool
   }
 
 instance Default ImageConfig where
   def = ImageConfig
     { _size = Nothing
     , _rounded = Nothing
+    , _avatar = False
     }
+
+imageConfigClasses :: ImageConfig -> [Text]
+imageConfigClasses ImageConfig {..} = catMaybes
+  [ uiText <$> _size
+  , uiText <$> _rounded
+  , justWhen _avatar "avatar"
+  ]
 
 data Image = Image
   { _src :: Text
@@ -50,17 +59,16 @@ data Image = Image
 
 data ImageRounded = Rounded | Circular deriving (Eq, Show)
 
-imageRounded :: ImageRounded -> Text
-imageRounded = T.toLower . T.pack . show
+instance UiClassText ImageRounded where
+  uiText Rounded = "rounded"
+  uiText Circular = "circular"
 
 instance UI t m Image where
   type Return t m Image = ()
-  ui (Image src ImageConfig {..}) = elAttr "img" attrs blank
+  ui (Image src config@ImageConfig {..}) = elAttr "img" attrs blank
     where
       attrs = "src" =: src <> "class" =: T.unwords classes
-      classes = imgRoundedClass $ imgSizeClass [ "ui", "image" ]
-      imgSizeClass = maybe id ((:) . uiText) _size
-      imgRoundedClass = maybe id ((:) . imageRounded) _rounded
+      classes = "ui" : "image" : imageConfigClasses config
 
 data HeaderConfig m = HeaderConfig
   { _image :: Maybe Image

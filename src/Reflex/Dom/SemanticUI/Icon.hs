@@ -117,14 +117,6 @@ iconConfigClasses IconConfig {..} = catMaybes
   , uiText <$> _color
   ]
 
-nothingIf :: Eq a => a -> Maybe a -> Maybe a
-nothingIf x (Just y) | x == y = Nothing
-nothingIf _ m = m
-
-justWhen :: Bool -> a -> Maybe a
-justWhen True = Just
-justWhen False = const Nothing
-
 data IconsConfig = IconsConfig
   { _size :: Maybe Size
   }

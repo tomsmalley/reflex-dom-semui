@@ -63,11 +63,22 @@ imap f = go 0
 
 ------------------------------------------------------------------------------
 
+nothingIf :: Eq a => a -> Maybe a -> Maybe a
+nothingIf x (Just y) | x == y = Nothing
+nothingIf _ m = m
+
+justWhen :: Bool -> a -> Maybe a
+justWhen True = Just
+justWhen False = const Nothing
+
 class UI t m a where
   type Return t m a
   ui :: MonadWidget t m => a -> m (Return t m a)
   ui = fmap snd . ui'
   ui' :: MonadWidget t m => a -> m (El t, Return t m a)
+
+ui_ :: (MonadWidget t m, UI t m a) => a -> m ()
+ui_ = void . ui
 
 class Item a where
   toItem :: a -> a
@@ -77,6 +88,10 @@ class (ToPart a, UI t m a) => Part t m a where
   part = ui . toPart
 
 instance (ToPart a, UI t m a) => Part t m a where
+
+instance UI t m Text where
+  type Return t m Text = ()
+  ui = text
 
 class ToPart a where
   toPart :: a -> a

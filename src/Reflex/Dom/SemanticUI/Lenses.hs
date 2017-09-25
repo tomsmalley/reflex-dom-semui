@@ -18,8 +18,13 @@ import Reflex.Dom.SemanticUI.Menu
 $(makeFieldsNoPrefix ''Checkbox)
 $(makeFieldsNoPrefix ''CheckboxResult)
 $(makeFieldsNoPrefix ''CheckboxConfig)
+
 $(makeFieldsNoPrefix ''Dropdown)
 $(makeFieldsNoPrefix ''DropdownConfig)
+
+$(makeFieldsNoPrefix ''DropdownItem)
+$(makeFieldsNoPrefix ''DropdownItemConfig)
+
 $(makeFieldsNoPrefix ''RadioItem)
 $(makeFieldsNoPrefix ''RadioItemConfig)
 $(makeFieldsNoPrefix ''RadioGroupConfig)
