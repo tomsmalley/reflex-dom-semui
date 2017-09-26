@@ -36,6 +36,7 @@ data ImageConfig = ImageConfig
   { _size :: Maybe Size
   , _rounded :: Maybe ImageRounded
   , _avatar :: Bool
+  , _floated :: Maybe Floated
   }
 
 instance Default ImageConfig where
@@ -43,6 +44,7 @@ instance Default ImageConfig where
     { _size = Nothing
     , _rounded = Nothing
     , _avatar = False
+    , _floated = Nothing
     }
 
 imageConfigClasses :: ImageConfig -> [Text]
@@ -50,6 +52,7 @@ imageConfigClasses ImageConfig {..} = catMaybes
   [ uiText <$> _size
   , uiText <$> _rounded
   , justWhen _avatar "avatar"
+  , uiText <$> _floated
   ]
 
 data Image = Image
@@ -79,6 +82,7 @@ data HeaderConfig m = HeaderConfig
   , _floated :: Maybe Floated
   , _item :: Bool
   , _component :: Bool -- This is the "ui" (component) class
+  , _attributes :: Map Text Text
   }
 
 instance Default (HeaderConfig m) where
@@ -91,6 +95,7 @@ instance Default (HeaderConfig m) where
     , _floated = Nothing
     , _item = False
     , _component = True
+    , _attributes = mempty
     }
 
 headerConfigClasses :: HeaderConfig m -> [Text]
@@ -158,8 +163,10 @@ instance m ~ m' => UI t m' (Anchor m a) where
 instance m ~ m' => UI t m' (Header m a) where
   type Return t m' (Header m a) = a
   ui (Header size widget config@HeaderConfig {..}) = case _header of
-    PageHeader -> elClass (headerSizeEl size) (T.unwords classes) iContent
-    ContentHeader -> divClass (T.unwords $ headerSize size : classes) iContent
+    PageHeader -> elAttr (headerSizeEl size) attrs iContent
+      where attrs = "class" =: T.unwords classes <> _attributes
+    ContentHeader -> elAttr "div" attrs iContent
+      where attrs = "class" =: T.unwords (headerSize size : classes) <> _attributes
     where
       classes = "header" : headerConfigClasses config
       iContent
@@ -171,4 +178,4 @@ instance m ~ m' => UI t m' (Header m a) where
             a <- widget
             divClass "sub header" sub
             return a
-        | otherwise = widget
+        | otherwise = divClass "content" widget

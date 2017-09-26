@@ -53,7 +53,7 @@ import           Reflex.Dom.SemanticUI.Header
 
 -- | Custom Dropdown item configuration
 data DropdownItemConfig' m = DropdownItemConfig'
-  { dataText :: T.Text
+  { dataText' :: T.Text
     -- ^ dataText (shown for the selected item)
   , internal :: m ()
     -- ^ Procedure for drawing the DOM contents of the menu item
@@ -134,6 +134,7 @@ data DropdownConfig t a = DropdownConfig
   , _inline :: Bool
   } deriving Functor
 
+-- TODO check that this is lawful
 instance (Reflex t) => Applicative (DropdownConfig t) where
   pure a = DropdownConfig
     { _initialValue = a
@@ -159,42 +160,11 @@ instance (Reflex t) => Applicative (DropdownConfig t) where
     }
 
 
-
 instance (Reflex t) => Default (DropdownConfig t (Maybe a)) where
-  def = DropdownConfig
-    { _initialValue = Nothing
-    , _setValue = never
-    , _attributes = mempty
-    , _placeholder = mempty
-    , _maxSelections = Nothing
-    , _useLabels = True
-    , _fullTextSearch = False
-    , _search = False
-    , _selection = False
-    , _fluid = False
-    , _action = Activate
-    , _item = False
-    , _textOnly = False
-    , _inline = False
-    }
+  def = pure Nothing
 
 instance (Reflex t) => Default (DropdownConfig t [a]) where
-  def = DropdownConfig
-    { _initialValue = mempty
-    , _setValue = never
-    , _attributes = mempty
-    , _placeholder = mempty
-    , _maxSelections = Nothing
-    , _useLabels = True
-    , _fullTextSearch = False
-    , _search = False
-    , _selection = False
-    , _fluid = False
-    , _action = Activate
-    , _item = False
-    , _textOnly = False
-    , _inline = False
-    }
+  def = pure []
 
 dropdownConfigClasses :: DropdownConfig t a -> [Text]
 dropdownConfigClasses DropdownConfig {..} = catMaybes
@@ -221,6 +191,7 @@ indexToItem' items i' = do
 data DropdownItemConfig = DropdownItemConfig
   { _icon :: Maybe Icon
   , _image :: Maybe Image
+  , _dataText :: Maybe Text
   }
 --  { dataText :: T.Text
 --    -- ^ dataText (shown for the selected item)
@@ -230,6 +201,7 @@ instance Default DropdownItemConfig where
   def = DropdownItemConfig
     { _icon = Nothing
     , _image = Nothing
+    , _dataText = Nothing
     }
 
 data DropdownItem a = DropdownItem
@@ -336,7 +308,11 @@ dropdownInternal' items isMulti conf@DropdownConfig {..} = do
       ("class" =: "item" <> "data-value" =: tshow i <> a)
     putItem i (DropdownItem _ t DropdownItemConfig {..}) =
       let attrs = "class" =: "item" <> "data-value" =: tshow i
-               <> if _textOnly then "data-text" =: t else mempty
+               <> dataText
+          dataText
+            | Just dt <- _dataText = "data-text" =: dt
+            | _textOnly = "data-text" =: t
+            | otherwise = mempty
       in elAttr "div" attrs $ do
           maybe blank ui_ _icon
           maybe blank ui_ _image

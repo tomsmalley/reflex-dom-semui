@@ -6,7 +6,7 @@
 
 module Example.QQ where
 
-import Language.Haskell.TH (ExpQ, stringE, reify, pprint)
+import Language.Haskell.TH (ExpQ, stringE, reify, pprint, reportError, runIO)
 import Language.Haskell.TH.Syntax (Name)
 import Language.Haskell.TH.Quote
 import Language.Haskell.Exts hiding (parseExp, Name)
@@ -32,27 +32,45 @@ import Debug.Trace
 printDefinition :: (String -> String) -> Name -> ExpQ
 printDefinition preproc name = do
   info <- reify name
-  let mode = defaultParseMode
-        { baseLanguage = Haskell2010
-        , extensions = EnableExtension <$> [TypeFamilies, ExplicitForAll, DataKinds, GADTs, MultiParamTypeClasses]
-        }
-      style' = style { lineLength = 200, ribbonsPerLine = 1 }
-      pp = prettyPrintStyleMode style' defaultMode . fromParseResult . parseDeclWithMode mode . stripForAll . stripTypes . stripNumbers . stripModules $ pprint info
-      -- silly hack to remove newlines before running preproc
-      pp' = prettyPrintStyleMode style' defaultMode . fromParseResult . parseDeclWithMode mode $ preproc pp
-  [|hscode pp'|]
+  let
+    mode = defaultParseMode
+      { baseLanguage = Haskell2010
+      , extensions = EnableExtension <$>
+          [TypeFamilies, ExplicitForAll, DataKinds, GADTs, MultiParamTypeClasses]
+      }
+    style' = style { lineLength = 600, ribbonsPerLine = 1 }
+    parse = parseDeclWithMode mode . stripForAll . stripTypes . stripNumbers . stripModules . preproc . pprint
+    prettyPrint = newlines . prettyPrintStyleMode style' defaultMode
+    pp = prettyPrint . fromParseResult . parse $ info
+  case parse info of
+    ParseOk a -> [|hscode pp|]
+    ParseFailed loc str -> do
+      runIO $ print loc
+      runIO $ putStrLn $ stripModules $ pprint info
+      fail str
 
 hscode :: MonadWidget t m => String -> m ()
 hscode = void . elAttr "code" ("class" =: "haskell")
+       . elDynHtml' "pre" . constDyn . hscolour
+
+hsCodeInline :: MonadWidget t m => String -> m ()
+hsCodeInline = void . elAttr "code" ("class" =: "haskell inline")
        . elDynHtml' "pre" . constDyn . hscolour
 
 hscodeInline :: MonadWidget t m => String -> m ()
 hscodeInline = void . elAttr "code" ("class" =: "inline haskell")
              . elDynHtml' "pre" . constDyn . hscolour
 
-
 hscolour :: String -> Text
 hscolour = T.strip . T.pack . concatMap renderToken . tokenise . unindent
+
+newlines :: String -> String
+newlines "" = ""
+newlines ('{':' ':rest) = "\n  { " ++ newlines rest
+newlines ('{':rest) = "\n  { " ++ newlines rest
+newlines ('}':rest) = "\n  }" ++ newlines rest
+newlines (',':rest) = "\n  ," ++ newlines rest
+newlines (x:rest) = x : newlines rest
 
 stripForAll :: String -> String
 stripForAll "" = ""
@@ -82,8 +100,10 @@ stripNumbers :: String -> String
 stripNumbers "" = ""
 stripNumbers (x:'_':a:b:c:rest)
   | isAlphaNum x && isNumber a && isNumber b && isNumber c = x : stripNumbers rest
-  | isAlphaNum x && isNumber a && isNumber b = x : c : stripNumbers rest
-  | isAlphaNum x && isNumber a = x : b : c : stripNumbers rest
+stripNumbers (x:'_':a:b:rest)
+  | isAlphaNum x && isNumber a && isNumber b = x : stripNumbers rest
+stripNumbers (x:'_':a:rest)
+  | isAlphaNum x && isNumber a = x : stripNumbers rest
 stripNumbers (x:rest) = x : stripNumbers rest
 
 stripTypes :: String -> String

@@ -11,7 +11,6 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -47,7 +46,10 @@ data MenuConfig t a = MenuConfig
   , _setValue :: Event t a
   , _size :: Maybe Size
   , _vertical :: Bool
+  , _fluid :: Bool
+  , _textContent :: Bool
   , _customMenu :: Maybe Text
+  , _floated :: Maybe Floated
   } deriving Functor
 
 instance Reflex t => Applicative (MenuConfig t) where
@@ -56,7 +58,10 @@ instance Reflex t => Applicative (MenuConfig t) where
     , _setValue = never
     , _size = Nothing
     , _vertical = False
+    , _fluid = False
+    , _textContent = False
     , _customMenu = Nothing
+    , _floated = Nothing
     }
   mcf <*> mca = mca
     { _initialValue = (_initialValue mcf) (_initialValue mca)
@@ -65,32 +70,11 @@ instance Reflex t => Applicative (MenuConfig t) where
         $ align (_setValue mcf) (_setValue mca)
     }
 
-initMenuConfig :: Reflex t => a -> MenuConfig t a
-initMenuConfig a = MenuConfig
-    { _setValue = never
-    , _initialValue = a
-    , _size = Nothing
-    , _vertical = False
-    , _customMenu = Nothing
-    }
-
 instance Reflex t => Default (MenuConfig t (Maybe a)) where
-  def = MenuConfig
-    { _setValue = never
-    , _initialValue = Nothing
-    , _size = Nothing
-    , _vertical = False
-    , _customMenu = Nothing
-    }
+  def = pure Nothing
 
 instance Reflex t => Default (MenuConfig t (Proxy a)) where
-  def = MenuConfig
-    { _setValue = never
-    , _initialValue = Proxy
-    , _size = Nothing
-    , _vertical = False
-    , _customMenu = Nothing
-    }
+  def = pure Proxy
 
 
 menuConfigClasses :: MenuConfig t a -> [Text]
@@ -101,7 +85,9 @@ menuConfigClasses MenuConfig {..} = catMaybes
 --  , justWhen _link "link"
   [ uiText <$> _size
   , justWhen _vertical "vertical"
---  , uiText <$> _floated
+  , justWhen _fluid "fluid"
+  , justWhen _textContent "text"
+  , uiText <$> _floated
 --  , uiText <$> _color
   , _customMenu
   ]
@@ -253,7 +239,10 @@ renderItems allItems currentValue = go False allItems
         (evts, hlist) <- go inDropdown rest
         return ((value <$ clickEvt') : evts, hlist)
           where
-            (elType, attrs') = itemElAttrs conf { _link = StyleLink }
+            (elType, attrs') = itemElAttrs conf { _link = reLink }
+            reLink = case _link of
+              NoLink -> StyleLink
+              a -> a
             attrs = fmap (addActive attrs') $ demuxed selected $ Just value
             addActive m isActive = M.adjust (<> if isActive then " active" else "") "class" m
 

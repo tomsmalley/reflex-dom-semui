@@ -7,6 +7,12 @@
   margin-left: 3em !important;
 }
 
+#main > div > p,
+#main > div > .intro > p {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
 #main.container {
   position: relative;
   padding: 2em 0 6em;
@@ -51,8 +57,9 @@
   padding: 0;
 }
 
-code.inline {
+code.inline, code.inline pre {
   display: inline;
+  white-space: pre-wrap;
 }
 
 /* From hackage-css manni.css */
@@ -62,7 +69,7 @@ code.inline {
 .hs-conid  { color: #007788; font-weight: bold ;}
 .hs-conop  { color: #555555 ;}
 .hs-cpp  { color: #006699; font-weight: bold ;}
-.hs-definition  { color: #CC00FF ;}
+.hs-definition  { color: #773399 ;}
 .hs-keyglyph  { color: #000000; font-weight: bold ;}
 .hs-keyword  { color: #006699; font-weight: bold ;}
 .hs-layout { color: #000000;}
