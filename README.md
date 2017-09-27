@@ -49,3 +49,13 @@ Navigate to `./result/bin/example.jsexe/index.html` to see the app.
 If you have changed the example and are submitting a pull request you should
 update the `docs` folder with the updated javascript. Build the example app with
 ghcjs and run `./makedocs.sh` to do this.
+
+---
+
+# Rapid development
+
+Once in a ghc nix-shell:
+```
+ghcid "--command=stack ghci --system-ghc example" "--test=Main.debug" --warnings
+```
+

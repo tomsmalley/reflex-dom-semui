@@ -31,12 +31,21 @@ let
 
 in rec {
 
-  ghc = (doOverrides platform.ghc).callPackage ./reflex-dom-semui.nix {
-    ghc = platform.ghc;
+  semantic-reflex = (doOverrides platform.ghc).callPackage ./semantic-reflex {
+    ghcjs = false;
   };
 
-  ghcjs = (doOverrides platform.ghcjs).callPackage ./reflex-dom-semui.nix {
+  semantic-reflex-js = (doOverrides platform.ghcjs).callPackage ./semantic-reflex {
+    ghcjs = true;
+  };
+  ghc = (doOverrides platform.ghc).callPackage ./example {
+    ghc = platform.ghc;
+    inherit semantic-reflex;
+  };
+
+  ghcjs = (doOverrides platform.ghcjs).callPackage ./example {
     ghc = platform.ghcjs;
+    semantic-reflex = semantic-reflex-js;
   };
 
 }

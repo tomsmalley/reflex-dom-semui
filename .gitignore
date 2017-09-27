@@ -1,5 +1,7 @@
 dist
 dist-newstyle
+cabal.project.local
+.stack-work
 *.DS_Store
 *.swp
 result*
