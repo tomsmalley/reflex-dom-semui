@@ -19,6 +19,7 @@
   margin-right: 387px !important;
   margin-left: 3em !important;
   width: auto !important;
+  max-width: 960px !important;
 }
 #main.container > .right.rail {
   margin-left: 3em;
@@ -45,7 +46,8 @@
   }
 }
 
-#main.container .card {
+#main.container > div > .card {
+  margin-top: 4em;
 }
 
 .haskell pre {

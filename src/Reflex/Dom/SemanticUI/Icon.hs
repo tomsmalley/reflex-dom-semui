@@ -72,6 +72,12 @@ instance UI t m Label where
         classes = "ui" : "label" : labelConfigClasses config
         elType = if _link then "a" else "div"
 
+data Flag = Flag Text
+
+instance UI t m Flag where
+  type Return t m Flag = ()
+  ui (Flag flag) = elClass "i" (flag <> " flag") blank
+
 data Icon
   = Icon Text IconConfig
   | Icons [Icon] IconsConfig
