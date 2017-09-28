@@ -2,11 +2,9 @@ name:                semantic-reflex
 version:             0.1
 license:             BSD3
 license-file:        LICENSE
-synopsis:            A reflex-dom API for semantic-ui components
+synopsis:            Semantic UI components for Reflex Dom
 description:         This package provides a Reflex wrapper around the
-                     Semantic UI components. The goal is to make it fast
-                     and easy to build nice looking applications and make
-                     Semantic UI functionality a lot more discoverable.
+                     Semantic UI components.
 author:              Tom Smalley
 maintainer:          tfsmalley@gmail.com
 category:            Web
@@ -29,10 +27,6 @@ data-files:
 
 library
   hs-source-dirs: src
--- This is disabled due to https://github.com/reflex-frp/reflex-platform/issues/91
---  js-sources:
---      lib/semantic.min.js
---    , lib/jquery-3.2.1.min.js
 
   exposed-modules:
     Reflex.Dom.SemanticUI
@@ -73,13 +67,16 @@ library
       , wai-app-static
       , warp
       , websockets
-  if impl(ghcjs)
-    build-depends: ghcjs-base
 
-  ghc-options: -Wall -fno-warn-unused-do-bind -fno-warn-orphans
+  ghc-options: -Wall
   cpp-options: -D_GHCJS_ -DGHCJS_GC_INTERVAL=60000 -DGHCJS_BROWSER
 
   default-language:    Haskell2010
+
+-- This is disabled due to https://github.com/reflex-frp/reflex-platform/issues/91
+--  js-sources:
+--      lib/semantic.min.js
+--    , lib/jquery-3.2.1.min.js
 
 source-repository head
   type: git

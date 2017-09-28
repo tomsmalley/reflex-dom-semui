@@ -73,12 +73,16 @@ justWhen False = const Nothing
 
 class UI t m a where
   type Return t m a
-  ui :: MonadWidget t m => a -> m (Return t m a)
-  ui = fmap snd . ui'
   ui' :: MonadWidget t m => a -> m (El t, Return t m a)
+
+ui :: (MonadWidget t m, UI t m a) => a -> m (Return t m a)
+ui = fmap snd . ui'
 
 ui_ :: (MonadWidget t m, UI t m a) => a -> m ()
 ui_ = void . ui
+
+part_ :: (MonadWidget t m, Part t m a) => a -> m ()
+part_ = void . part
 
 class Item a where
   toItem :: a -> a
@@ -91,7 +95,7 @@ instance (ToPart a, UI t m a) => Part t m a where
 
 instance UI t m Text where
   type Return t m Text = ()
-  ui = text
+  ui' = el' "" . text
 
 class ToPart a where
   toPart :: a -> a

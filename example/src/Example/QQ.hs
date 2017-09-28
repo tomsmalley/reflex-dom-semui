@@ -6,45 +6,42 @@
 
 module Example.QQ where
 
-import Language.Haskell.TH (ExpQ, stringE, reify, pprint, reportError, runIO)
+import Language.Haskell.TH (ExpQ, reify, pprint, runIO)
 import Language.Haskell.TH.Syntax (Name)
-import Language.Haskell.TH.Quote
-import Language.Haskell.Exts hiding (parseExp, Name)
+import Language.Haskell.TH.Quote (QuasiQuoter(..))
+import qualified Language.Haskell.Exts as Exts
 -- For parsing the haskell strings to template-haskell AST
-import Language.Haskell.Meta
-import Language.Haskell.Meta.Utils
+import Language.Haskell.Meta (parseExp)
+import Language.Haskell.Meta.Utils (eitherQ)
 
 import Data.Char (isUpper, isAlpha, isAlphaNum, isNumber)
 
 import Language.Haskell.HsColour.Classify (tokenise)
 import Language.Haskell.HsColour.CSS (renderToken)
 
-import Control.Monad (void, when)
-import Control.Lens ((?~), (.~), (&))
+import Control.Monad (void)
 
 import Reflex.Dom.SemanticUI hiding (parseType)
-import Reflex.Dom.SemanticUI.Common
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Debug.Trace
-
+-- | Pretty print the definition of a haskell type
 printDefinition :: (String -> String) -> Name -> ExpQ
 printDefinition preproc name = do
   info <- reify name
   let
-    mode = defaultParseMode
-      { baseLanguage = Haskell2010
-      , extensions = EnableExtension <$>
-          [TypeFamilies, ExplicitForAll, DataKinds, GADTs, MultiParamTypeClasses]
+    mode = Exts.defaultParseMode
+      { Exts.baseLanguage = Exts.Haskell2010
+      , Exts.extensions = Exts.EnableExtension <$>
+          [Exts.TypeFamilies, Exts.ExplicitForAll, Exts.DataKinds, Exts.GADTs, Exts.MultiParamTypeClasses]
       }
-    style' = style { lineLength = 600, ribbonsPerLine = 1 }
-    parse = parseDeclWithMode mode . stripForAll . stripTypes . stripNumbers . stripModules . preproc . pprint
-    prettyPrint = newlines . prettyPrintStyleMode style' defaultMode
-    pp = prettyPrint . fromParseResult . parse $ info
+    style' = Exts.style { Exts.lineLength = 600, Exts.ribbonsPerLine = 1 }
+    parse = Exts.parseDeclWithMode mode . stripForAll . stripTypes . stripNumbers . stripModules . preproc . pprint
+    prettyPrint = newlines . Exts.prettyPrintStyleMode style' Exts.defaultMode
+    pp = prettyPrint . Exts.fromParseResult . parse $ info
   case parse info of
-    ParseOk a -> [|hscode pp|]
-    ParseFailed loc str -> do
+    Exts.ParseOk _ -> [|hscode pp|]
+    Exts.ParseFailed loc str -> do
       runIO $ print loc
       runIO $ putStrLn $ stripModules $ pprint info
       fail str
@@ -114,13 +111,15 @@ stripTypes ('(':t:a:' ':':':':':' ':rest)
   | isAlpha t && isAlphaNum a = t:a:' ': stripTypes (drop 1 $ dropWhile (/= ')') rest)
 stripTypes (x:rest) = x : stripTypes rest
 
-ex :: QuasiQuoter
-ex = QuasiQuoter
-  { quoteExp = \ex -> [|exampleWrapper ex $(eitherQ id (parseExp $ "do\n" ++ ex))|]
-  , quotePat = const $ error "ex: not an expression"
-  , quoteType = const $ error "ex: not an expression"
-  , quoteDec = const $ error "ex: not an expression"
-  }
+-- | Strips indentation spaces from a string
+unindent :: String -> String
+unindent str = unlines $ map (drop $ minSpaces loc) loc
+  where loc = lines str
+
+-- | Counts the smallest number of spaces that any string in the list is
+-- indented by
+minSpaces :: [String] -> Int
+minSpaces = minimum . map (length . takeWhile (== ' ')) . filter (/= "")
 
 mkExample :: QuasiQuoter
 mkExample = QuasiQuoter
@@ -134,69 +133,3 @@ mkResetExample :: QuasiQuoter
 mkResetExample = mkExample
   { quoteExp = \ex -> [|(ex, $(eitherQ id $ parseExp $ "\resetEvent -> do\n" ++ ex))|]
   }
-
-exWithValue :: QuasiQuoter
-exWithValue = ex { quoteExp = \ex -> [|exampleWrapperDyn ex $(eitherQ id (parseExp $ "do\n" ++ ex))|] }
-
-exampleWrapperDyn :: (Show a, MonadWidget t m) => String -> m (Dynamic t a) -> m (Dynamic t a)
-exampleWrapperDyn code widget = divClass "ui card" $ do
-  rec
-    (isOpen, widgetResult) <- divClass "content" $ do
-      isOpen <- toggleUI $ \isOpen ->
-        Label (if isOpen then "hide code" else "show code") $ def
-          & hAttached ?~ RightAttached & vAttached ?~ TopAttached & link .~ True
-      widgetResult <- elAttr "div" ("style" =: "margin-top: 0 !important;") widget
-      return (isOpen, widgetResult)
-  void $ dyn $ codeEl <$> isOpen
-  divClass "extra content" $ do
-    ui $ Header H5 (text "Value") def
-    dyn $ hscodeInline . show <$> widgetResult
-  return widgetResult
-  where
-    codeEl False = blank
-    codeEl True = divClass "content" $ hscode code
-
-exampleWrapper :: MonadWidget t m => String -> m a -> m a
-exampleWrapper code widget = divClass "ui card" $ do
-  rec
-    (isOpen, widgetResult) <- divClass "content" $ do
-      isOpen <- toggleUI $ \isOpen ->
-        Label (if isOpen then "hide code" else "show code") $ def
-          & hAttached ?~ RightAttached & vAttached ?~ TopAttached & link .~ True
-      widgetResult <- elAttr "div" ("style" =: "margin-top: 0 !important;") widget
-      return (isOpen, widgetResult)
-  void $ dyn $ codeEl <$> isOpen
-  return widgetResult
-  where
-    codeEl False = blank
-    codeEl True = divClass "content" $ hscode code
-
--- | Strips indentation spaces from a string
-unindent :: String -> String
-unindent str = unlines $ map (drop $ minSpaces loc) loc
-  where loc = lines str
-
--- | Counts the smallest number of spaces that any string in the list is
--- indented by
-minSpaces :: [String] -> Int
-minSpaces = minimum . map (length . takeWhile (== ' ')) . filter (/= "")
-
--- | Toggle button in the form of a plus/minus icon. Is 'True' when displaying a
--- minus, 'False' when displaying a plus.
-toggleUI' :: (MonadWidget t m) => (Bool -> m (Event t b)) -> m (Dynamic t Bool)
-toggleUI' element = do
-  rec
-    updateEvent <- dyn $ element <$> showing
-    clickEvent <- switchPromptly never updateEvent
-    showing <- toggle False clickEvent
-  return showing
-
--- | Toggle button in the form of a plus/minus icon. Is 'True' when displaying a
--- minus, 'False' when displaying a plus.
-toggleUI :: (UI t m a, MonadWidget t m, Return t m a ~ Event t b) => (Bool -> a) -> m (Dynamic t Bool)
-toggleUI element = do
-  rec
-    updateEvent <- dyn $ ui . element <$> showing
-    clickEvent <- switchPromptly never updateEvent
-    showing <- toggle False clickEvent
-  return showing

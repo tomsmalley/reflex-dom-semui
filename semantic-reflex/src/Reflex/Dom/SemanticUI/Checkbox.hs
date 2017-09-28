@@ -39,8 +39,6 @@ import           Reflex.Dom.Core hiding
   , CheckboxConfig (..), checkboxConfig_attributes, checkboxConfig_setValue
   )
 
-import Debug.Trace
-
 import Reflex.Dom.SemanticUI.Common
 
 --------------------------------------------------------------------------------

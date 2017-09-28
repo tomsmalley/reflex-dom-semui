@@ -34,14 +34,14 @@ daemon port css app = do
 -- javascript, css, and theme folder.
 runApp :: ByteString -> Int -> JSM () -> Middleware -> JSM ()-> IO ()
 runApp css port mainApp middleware preApp = do
-  server <- jsaddleWithAppOr defaultConnectionOptions
+  jsaddle <- jsaddleWithAppOr defaultConnectionOptions
     (preApp >> app) (middleware static)
-  runSettings settings server
+  runSettings settings jsaddle
   where
     settings = setPort port $ setTimeout 3600 $ defaultSettings
     static = staticApp $ defaultFileServerSettings dir
     app = makeHead css >> mainApp >> syncPoint
-    dir = $(strToExp =<< makeRelativeToProject "lib")
+    dir = $(strToExp =<< makeRelativeToProject "lib/dist")
 
 -- Needed for non js targets, since the js-sources in the cabal file are not
 -- linked
@@ -50,7 +50,7 @@ makeHead css = do
 
   document <- jsg "document"
 
-  -- Ugly hacks
+  -- Push the css into a style tag
   style <- document ^. js1 "createElement" "style"
   style ^. jss "innerText" (unpack css)
   void $ document ^. js "head" ^. js1 "appendChild" style
@@ -62,9 +62,9 @@ makeHead css = do
   void $ document ^. js "head" ^. js1 "appendChild" semanticCSS
 
   jquery <- document ^. js1 "createElement" "script"
-  jquery ^. jss "src" "jquery-3.2.1.min.js"
+  jquery ^. jss "src" "js/jquery-3.2.1.min.js"
   void $ document ^. js "head" ^. js1 "appendChild" jquery
 
   semantic <- document ^. js1 "createElement" "script"
-  semantic ^. jss "src" "semantic.min.js"
+  semantic ^. jss "src" "js/semantic.min.js"
   void $ document ^. js "head" ^. js1 "appendChild" semantic

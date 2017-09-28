@@ -8,6 +8,7 @@ import Example
 #ifndef ghcjs_HOST_OS
 
 import Reflex.Dom.SemanticUI.Warp
+import Data.ByteString
 import Data.FileEmbed
 
 #endif
@@ -23,6 +24,7 @@ main = example
 port :: Int
 port = 3708
 
+css :: ByteString
 css = $(embedFile =<< makeRelativeToProject "styling.css")
 
 -- | Start the warp server

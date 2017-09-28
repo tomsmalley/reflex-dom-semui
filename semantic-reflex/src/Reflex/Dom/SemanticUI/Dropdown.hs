@@ -21,15 +21,14 @@ module Reflex.Dom.SemanticUI.Dropdown
   , DropdownItemConfig (..)
   ) where
 
-------------------------------------------------------------------------------
 import           Control.Monad
 import           Control.Monad.Trans
-import           Control.Lens ((^.), (%~))
+import           Control.Lens ((^.))
 import           Data.Default
 import           Data.Functor.Identity
 import qualified Data.List as L
 import           Data.Map (Map)
-import           Data.Maybe (catMaybes, maybeToList, listToMaybe, mapMaybe)
+import           Data.Maybe (catMaybes, listToMaybe, mapMaybe)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -127,7 +126,7 @@ instance (Reflex t) => Applicative (DropdownConfig t) where
   f <*> a = a
     { _initialValue = (_initialValue f) (_initialValue a)
     , _setValue = fmapMaybe id
-        $ fmap (these (const Nothing) (const Nothing) (\f a -> Just $ f a))
+        $ fmap (these (const Nothing) (const Nothing) (\f' a' -> Just $ f' a'))
         $ align (_setValue f) (_setValue a)
     }
 
@@ -186,19 +185,23 @@ data Dropdown f t m a = Dropdown
 
 instance (t ~ t', m ~ m', Eq a) => UI t' m' (Dropdown Maybe t m a) where
   type Return t' m' (Dropdown Maybe t m a) = Dynamic t (Maybe a)
-  ui (Dropdown items config@DropdownConfig{..}) = do
-    evt <- dropdownInternal items False config
-    holdDyn def $ listToMaybe <$> evt
+  ui' (Dropdown items config@DropdownConfig{..}) = do
+    (e, evt) <- dropdownInternal items False config
+    fmap ((,) e) $ holdDyn def $ listToMaybe <$> evt
 
 instance (t ~ t', m ~ m', Eq a) => UI t' m' (Dropdown [] t m a) where
   type Return t' m' (Dropdown [] t m a) = Dynamic t [a]
-  ui (Dropdown items config@DropdownConfig{..}) = do
-    holdDyn def =<< dropdownInternal items True config
+  ui' (Dropdown items config@DropdownConfig{..}) = do
+    (e, evt) <- dropdownInternal items True config
+    dynVal <- holdDyn def evt
+    return (e, dynVal)
 
 instance (t ~ t', m ~ m', Eq a) => UI t' m' (Dropdown Identity t m a) where
   type Return t' m' (Dropdown Identity t m a) = Dynamic t a
-  ui (Dropdown items config@DropdownConfig{..}) = do
-    holdDyn (runIdentity _initialValue) . fmap f =<< dropdownInternal items False config'
+  ui' (Dropdown items config@DropdownConfig{..}) = do
+    (e, evt) <- dropdownInternal items False config'
+    dynVal <- holdDyn (runIdentity _initialValue) $ fmap f evt
+    return (e, dynVal)
       where f (a : _) = a
             f _ = runIdentity _initialValue
             -- Ignore attempts to set the value to an item not in the list
@@ -207,6 +210,7 @@ instance (t ~ t', m ~ m', Eq a) => UI t' m' (Dropdown Identity t m a) where
 itemExists :: Eq a => [DropdownItem m a] -> a -> Bool
 itemExists [] _ = False
 itemExists (DropdownItem a _ _:as) b = if a == b then True else itemExists as b
+itemExists (_:as) b = itemExists as b
 
 -- | Internal function with shared behaviour
 dropdownInternal
@@ -214,7 +218,7 @@ dropdownInternal
   => [DropdownItem m a]             -- ^ Items
   -> Bool                         -- ^ Is multiple dropdown
   -> DropdownConfig t (f a)       -- ^ Dropdown config
-  -> m (Event t [a])
+  -> m (El t, Event t [a])
 dropdownInternal items isMulti conf@DropdownConfig {..} = do
 
   (divEl, _) <- elAttr' "div" ("class" =: T.unwords classes <> _attributes) $ do
@@ -246,13 +250,11 @@ dropdownInternal items isMulti conf@DropdownConfig {..} = do
 
   let indices = mapMaybe (indexToItem items) . T.splitOn "," <$> onChangeEvent
 
-  return indices
+  return (divEl, indices)
 
   where
     maxSel = if isMulti then _maxSelections else Nothing
     classes = "ui" : "dropdown" : (if isMulti then "multiple" else "") : dropdownConfigClasses conf
-    itemDiv i a = elAttr "div"
-      ("class" =: "item" <> "data-value" =: tshow i <> a)
     getIndices :: Foldable f => f a -> [Int]
     getIndices vs = L.findIndices (`elem` vs) $ mapMaybe getValue items
 
@@ -273,6 +275,8 @@ putItems items = sequence_ $ imap putItem items
           maybe blank ui_ _image
           maybe blank ui_ _flag
           text t
+    -- TODO FIXME
+    putItem _ _ = return ()
 
 
 

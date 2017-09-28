@@ -95,7 +95,7 @@ data RadioGroup t a = RadioGroup
 
 instance Eq a => UI t m (RadioGroup t a) where
   type Return t m (RadioGroup t a) = Dynamic t (Maybe a)
-  ui (RadioGroup name items config) = radioGroup name items config
+  ui' (RadioGroup name items config) = radioGroup name items config
 
 -- | Create a group of radio checkboxes from the given list of items. The name
 -- is required to link the individual checkboxes together, it must be unique to
@@ -108,8 +108,8 @@ radioGroup
   => Text                   -- ^ Name of \<input\> elements
   -> [RadioItem a]      -- ^ Items
   -> RadioGroupConfig t a -- ^ Group config
-  -> m (Dynamic t (Maybe a))
-radioGroup name items config = divClass "grouped fields" $ do
+  -> m (El t, Dynamic t (Maybe a))
+radioGroup name items config = elClass' "div" "grouped fields" $ do
 
   -- Insert all of the items, collecting the raw elements and wrapping them with
   -- the given wrapper function

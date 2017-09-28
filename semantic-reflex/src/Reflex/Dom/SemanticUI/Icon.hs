@@ -16,17 +16,14 @@
 
 module Reflex.Dom.SemanticUI.Icon where
 
-------------------------------------------------------------------------------
 import           Data.Default
-import           Data.Maybe
 import           Data.Semigroup ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Reflex.Dom.Core hiding (fromJSString)
 import Data.Maybe (catMaybes)
-------------------------------------------------------------------------------
+
 import           Reflex.Dom.SemanticUI.Common
-------------------------------------------------------------------------------
 
 data HorizontalAttached = LeftAttached | RightAttached deriving (Eq, Show)
 data VerticalAttached = TopAttached | BottomAttached deriving (Eq, Show)
@@ -65,9 +62,9 @@ labelConfigClasses LabelConfig {..} = catMaybes
 instance UI t m Label where
   type Return t m Label = Event t ()
 
-  ui (Label txt config@LabelConfig {..}) = do
+  ui' (Label txt config@LabelConfig {..}) = do
     (e, _) <- elAttr' elType ("class" =: T.unwords classes) $ text txt
-    return $ domEvent Click e
+    return $ (e, domEvent Click e)
       where
         classes = "ui" : "label" : labelConfigClasses config
         elType = if _link then "a" else "div"
@@ -76,7 +73,7 @@ data Flag = Flag Text
 
 instance UI t m Flag where
   type Return t m Flag = ()
-  ui (Flag flag) = elClass "i" (flag <> " flag") blank
+  ui' (Flag flag) = elAttr' "i" ("class" =: (flag <> " flag")) blank
 
 data Icon
   = Icon Text IconConfig
@@ -141,16 +138,16 @@ instance Default IconsConfig where
 instance UI t m Icon where
   type Return t m Icon = Event t ()
 
-  ui (Icon icon config@IconConfig {..}) = do
+  ui' (Icon icon config@IconConfig {..}) = do
     (e, _) <- elAttr' "i" ("class" =: T.unwords classes <> mtitle) blank
-    return $ domEvent Click e
+    return (e, domEvent Click e)
       where classes = icon : "icon" : iconConfigClasses config
             mtitle
               | Just title <- _title = "title" =: title
               | otherwise = mempty
 
-  ui (Icons icons IconsConfig {..})
-    = elAttr "i" ("class" =: T.unwords classes) $ leftmost <$> traverse ui icons
+  ui' (Icons icons IconsConfig {..})
+    = elAttr' "i" ("class" =: T.unwords classes) $ leftmost <$> traverse ui icons
       where classes = "icons" : maybe [] (pure . uiText) _size
 
 data UiIcon = UiIcon

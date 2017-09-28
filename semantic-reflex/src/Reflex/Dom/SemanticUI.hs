@@ -19,11 +19,7 @@ module Reflex.Dom.SemanticUI
   , module Reflex.Dom.Core
   ) where
 
-------------------------------------------------------------------------------
 import           Data.ByteString
-import           Data.FileEmbed
-import           Data.Text (Text)
-------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Button
 import           Reflex.Dom.SemanticUI.Checkbox
 import           Reflex.Dom.SemanticUI.Common (basic, mini, compact, rightFloated, custom, tshow, Color (..), Size (..), small, ui, Floated(..), Part (..), jQuery, consoleLog, catchJS)
@@ -43,10 +39,8 @@ import Reflex.Dom.Core hiding
   , link, Link
   )
 import Language.Javascript.JSaddle (JSM)
-------------------------------------------------------------------------------
 
 
-------------------------------------------------------------------------------
 --semanticMain :: MonadWidget t m => m () -> JSM ()
 semanticMain :: (forall x. Widget x ()) -> JSM ()
 semanticMain = mainWidget

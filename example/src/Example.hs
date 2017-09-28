@@ -9,26 +9,22 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE DataKinds   #-}
 
+{-# OPTIONS_GHC -Wno-name-shadowing -Wno-unused-do-bind #-}
+
 module Example (example) where
 
 import GHC.Tuple
 import Control.Lens
 import Control.Monad ((<=<), void, when, forM_)
-import Control.Monad.Trans (liftIO)
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
 import Reflex.Dom.SemanticUI
 import Language.Javascript.JSaddle hiding ((!!))
 
 import Example.StateEnum
 import Example.CountryEnum
 import Example.QQ
-
-import Debug.Trace
 
 -- | Throughput
 data Throughput = Unmetered | Metered Int deriving (Eq, Show)
@@ -238,7 +234,7 @@ dropdowns = LinkedSection "Dropdown" "" $ do
               , DropdownItem "weekly" "This Week" $ def & dataText ?~ "this week"
               , DropdownItem "monthly" "This Month" $ def & dataText ?~ "this month"
               ]
-              $ pure (Identity "daily")
+              $ pure (Identity ("daily" :: Text))
                   & inline .~ True
                   & setValue .~ leftmost
                     [ Identity "daily" <$ resetEvent
@@ -349,7 +345,7 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
         $ MenuBase )
       $ MenuBase )
       $ def & vertical .~ True & setValue .~ (Nothing <$ resetEvent)
-    return selected
+    return (selected :: Dynamic t (Maybe Text))
    |]
 
   exampleCardDyn id "Sub Menu" "A menu item may contain another menu nested inside that acts as a grouped sub-menu" [mkExample|
@@ -384,7 +380,8 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
         $ MenuBase )
       $ MenuBase )
       $ def & vertical .~ True
-    return $ (,) <$> selected <*> search
+            & setValue .~ (Nothing <$ resetEvent)
+    return $ (,) <$> (selected :: Dynamic t (Maybe Text)) <*> search
    |]
 
   exampleCardDyn id "Arbitrary Widgets" "An item may contain an arbitrary widget with optional capture of the result" [mkExample|
@@ -413,6 +410,7 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
             & placeholder .~ "Pick your favourite..."
             & selection .~ True
             & fluid .~ True
+            & setValue .~ (Nothing <$ resetEvent)
         ) (def & link .~ NoLink)
       $ MenuBase )
       $ def & vertical .~ True
@@ -433,7 +431,7 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
       $ MenuBase
       ) $ pure "Home"
         & customMenu ?~ "secondary" & setValue .~ ("Home" <$ resetEvent)
-    return $ (,) <$> selected <*> _textInput_value search
+    return $ (,) <$> (selected :: Dynamic t Text) <*> _textInput_value search
   |]
 
   exampleCardDyn id "Secondary Menu" "A menu can adjust its appearance to de-emphasize its contents" [mkExample|
@@ -448,7 +446,7 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
           $ MenuBase)
       $ MenuBase
       ) $ def & customMenu ?~ "secondary" & setValue .~ (Nothing <$ resetEvent)
-    return $ (,) <$> selected <*> _textInput_value search
+    return $ (,) <$> (selected :: Dynamic t (Maybe Text)) <*> _textInput_value search
   |]
 
   exampleCardDyn id "Vertical Menu" "A vertical menu displays elements vertically" [mkExample|
@@ -456,11 +454,11 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
     inboxCount <- count <=< uiButton def $ text "Add inbox item"
     spamCount <- count <=< uiButton def $ text "Add spam item"
     updatesCount <- count <=< uiButton def $ text "Add updates item"
-    let renderItem label classes count = do
+    let renderItem label classes (count :: Int) = do
           text label
           divClass (T.unwords $ "ui" : "label" : classes) $ text $ T.pack $ show count
     fmap fst $ ui $ Menu
-      ( MenuItem "Inbox"
+      ( MenuItem ("Inbox" :: Text)
           (renderItem "Inbox" ["teal left pointing"] <$> inboxCount)
           (def & color ?~ Teal)
       $ MenuItem "Spam" (renderItem "Spam" [] <$> spamCount) def
@@ -497,7 +495,7 @@ radioGroups = LinkedSection "Radio Group" "" $ do
       divClass "column" $ do
         exampleCardDyn id "Slider group" "" [mkExample|
         \resetEvent -> do
-          let mkRadioItem x = RadioItem x (T.pack $ show x) def
+          let mkRadioItem x = RadioItem x (showThroughput x) def
               throughputs = mkRadioItem <$> [Metered 20, Metered 10, Metered 5, Unmetered]
           divClass "ui form" $ ui $ RadioGroup "throughput" throughputs $
             def & initialValue ?~ Unmetered
@@ -688,7 +686,3 @@ example = semanticMain $ do
 
   putSections [ menu, checkboxes, dropdowns, radioGroups, icons ]
 
-  -- liftJSM $ setupOnScroll
-
-  where
-    containerAttrs = "class" =: "ui container" <> "style" =: "margin-top: 1em;"

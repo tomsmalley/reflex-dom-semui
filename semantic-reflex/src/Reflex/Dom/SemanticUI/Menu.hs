@@ -17,10 +17,8 @@
 
 module Reflex.Dom.SemanticUI.Menu where
 
-import GHC.TypeLits as TL
 import Data.Kind (Type)
 import           Control.Monad (unless, void)
-import           Control.Monad.Trans (liftIO)
 import           Control.Lens ((^.))
 import           Data.Default (Default (def))
 import           Data.Map (Map)
@@ -30,13 +28,10 @@ import           Data.Semigroup ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import Data.These
-import qualified GHCJS.DOM.Element as DOM
-import           Language.Javascript.JSaddle
+import           Language.Javascript.JSaddle (liftJSM, js0)
 import           Reflex
-import           Reflex.Dom.Core hiding (Link)
+import           Reflex.Dom.Core hiding (Link, value)
 import Data.Align
-
-import Debug.Trace
 
 import Reflex.Dom.SemanticUI.Icon
 import Reflex.Dom.SemanticUI.Common
@@ -188,7 +183,7 @@ data Menu t m a xs = Menu
 
 instance (Ord a, m ~ m', t ~ t') => UI t' m' (Menu t m a xs) where
   type Return t' m' (Menu t m a xs) = (Dynamic t (Maybe a), HList xs)
-  ui (Menu items config@MenuConfig {..}) = divClass (T.unwords classes) $ do
+  ui' (Menu items config@MenuConfig {..}) = elClass' "div" (T.unwords classes) $ do
     rec (evts, xs) <- renderItems items vDyn
         vDyn <- holdDyn _initialValue $ leftmost $ _setValue : (fmap Just <$> evts)
     return (vDyn, xs)
@@ -202,7 +197,7 @@ data MenuDef t m a xs = MenuDef
 
 instance (Ord a, m ~ m', t ~ t') => UI t' m' (MenuDef t m a xs) where
   type Return t' m' (MenuDef t m a xs) = (Dynamic t a, HList xs)
-  ui (MenuDef items config@MenuConfig {..}) = divClass (T.unwords classes) $ do
+  ui' (MenuDef items config@MenuConfig {..}) = elClass' "div" (T.unwords classes) $ do
     rec (evts, xs) <- renderItems items (Just <$> vDyn)
         vDyn <- holdDyn _initialValue $ leftmost $ _setValue : evts
     return (vDyn, xs)
@@ -262,7 +257,7 @@ renderItems allItems currentValue = go False allItems
           where (elType, attrs) = itemElAttrs conf
 
       UIContent_ uiElem conf rest -> do
-        elAttr elType attrs $ part uiElem
+        elAttr elType attrs $ part_ uiElem
         go inDropdown rest
           where (elType, attrs) = itemElAttrs conf
 
@@ -272,12 +267,12 @@ renderItems allItems currentValue = go False allItems
         return (restEvents, b `HCons` restList)
 
       UIItemContent_ uiElem rest -> do
-        ui $ toItem uiElem
+        ui_ $ toItem uiElem
         go inDropdown rest
 
       MenuDropdown label sub rest -> do
         (e, (subEvents, subList)) <- elClass' "div" (T.unwords classes) $ do
-          ui $ Icon "dropdown" def -- icon must come first for sub dropdowns
+          ui_ $ Icon "dropdown" def -- icon must come first for sub dropdowns
           text label
           divClass "menu" $ go True sub
         -- Only do this on the top level dropdown!
@@ -290,7 +285,7 @@ renderItems allItems currentValue = go False allItems
 
       SubMenu mkItem sub rest -> do
         (subEvents, subList) <- divClass "item" $ do
-          dyn mkItem
+          void $ dyn mkItem
           divClass (T.unwords classes) $ go inDropdown sub
         (restEvents, restList) <- go inDropdown rest
         return (restEvents ++ subEvents, subList `hlistAppend` restList)

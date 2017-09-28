@@ -9,25 +9,17 @@
 
 module Reflex.Dom.SemanticUI.Header where
 
-import           Control.Monad (void)
-import           Control.Monad.Trans (liftIO)
-import           Control.Lens ((^.))
 import           Data.Default (Default (def))
-import           Data.Map (Map)
-import qualified Data.Map as M
+import Data.Map (Map)
 import           Data.Maybe (catMaybes)
 import           Data.Semigroup ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified GHCJS.DOM.Element as DOM
-import           Language.Javascript.JSaddle
 import           Reflex
 import           Reflex.Dom.Core hiding
   ( checkbox, Checkbox (..), checkbox_value, checkbox_change
   , CheckboxConfig (..), checkboxConfig_attributes, checkboxConfig_setValue
   )
-
-import Debug.Trace
 
 import Reflex.Dom.SemanticUI.Icon
 import Reflex.Dom.SemanticUI.Common
@@ -68,7 +60,7 @@ instance UiClassText ImageRounded where
 
 instance UI t m Image where
   type Return t m Image = ()
-  ui (Image src config@ImageConfig {..}) = elAttr "img" attrs blank
+  ui' (Image src config@ImageConfig {..}) = elAttr' "img" attrs blank
     where
       attrs = "src" =: src <> "class" =: T.unwords classes
       classes = "ui" : "image" : imageConfigClasses config
@@ -133,7 +125,7 @@ instance ToPart Paragraph where
 
 instance UI t m Paragraph where
   type Return t m Paragraph = ()
-  ui (Paragraph txt) = el "p" $ text txt
+  ui' (Paragraph txt) = el' "p" $ text txt
 
 -- | Create a header.
 --
@@ -156,16 +148,16 @@ type Href = Text
 data Anchor m a = Anchor Href (m a)
 instance m ~ m' => UI t m' (Anchor m a) where
   type Return t m' (Anchor m a) = (Event t (), a)
-  ui (Anchor href inner) = do
+  ui' (Anchor href inner) = do
     (a, b) <- elAttr' "a" ("href" =: href <> "class" =: "ui anchor") inner
-    return (domEvent Click a, b)
+    return (a, (domEvent Click a, b))
 
 instance m ~ m' => UI t m' (Header m a) where
   type Return t m' (Header m a) = a
-  ui (Header size widget config@HeaderConfig {..}) = case _header of
-    PageHeader -> elAttr (headerSizeEl size) attrs iContent
+  ui' (Header size widget config@HeaderConfig {..}) = case _header of
+    PageHeader -> elAttr' (headerSizeEl size) attrs iContent
       where attrs = "class" =: T.unwords classes <> _attributes
-    ContentHeader -> elAttr "div" attrs iContent
+    ContentHeader -> elAttr' "div" attrs iContent
       where attrs = "class" =: T.unwords (headerSize size : classes) <> _attributes
     where
       classes = "header" : headerConfigClasses config

@@ -2,11 +2,8 @@
 
 module Example.CountryEnum where
 
-import Data.Monoid ((<>))
 import Data.Text (Text)
-import qualified Data.Text as T
 import Prelude hiding (GT, LT)
-import Reflex.Dom.Core
 
 data CountryEnum
   = AF | AX | AL | DZ | AS | AD | AO | AI | AG | AR | AM | AW | AU | AT | AZ
