@@ -60,13 +60,6 @@ showContact Christian = "Christian"
 showContact Matt = "Matt"
 showContact Justen = "Justen Kitsune"
 
-renderContact :: MonadWidget t m => ContactEnum -> m ()
-renderContact contact = do
-  elAttr "img" ("class" =: "ui mini avatar image"
-            <> "src" =: ("http://semantic-ui.com/images/avatar/small/"
-            <> T.toLower (tshow contact) <> ".jpg")) blank
-  text $ showContact contact
-
 -- | Cards
 data CardEnum = Visa | Amex | Discover
   deriving (Bounded, Enum, Eq, Ord, Read, Show)
@@ -75,11 +68,6 @@ showCard :: CardEnum -> Text
 showCard Visa = "Visa"
 showCard Amex = "American Express"
 showCard Discover = "Discover"
-
-renderCard :: MonadWidget t m => CardEnum -> m ()
-renderCard card = do
-  elClass "i" (T.toLower (tshow card) <> " icon") blank
-  text $ showCard card
 
 data Section m = LinkedSection Text Text (m ())
 
@@ -228,7 +216,7 @@ dropdowns = LinkedSection "Dropdown" "" $ do
         \resetEvent -> el "span" $ do
           let mkItem contact = DropdownItem contact (showContact contact) $ def
                 & image ?~ Image (src contact) (def & avatar .~ True)
-              src contact = "http://semantic-ui.com/images/avatar/small/"
+              src contact = "https://semantic-ui.com/images/avatar/small/"
                           <> T.toLower (tshow contact) <> ".jpg"
               contacts = map mkItem [minBound..maxBound]
           text $ "Show me posts by "
@@ -622,7 +610,7 @@ setLocationHash hash = do
 
 putSections :: MonadWidget t m => [Section m] -> m ()
 putSections sections = do
-  pb :: Event t () <- delay 0 =<< getPostBuild
+  pb :: Event t () <- delay 0.1 =<< getPostBuild
   onLoadEvent <- performEvent $ liftJSM getLocationHash <$ pb
   performEvent_ $ liftJSM . scrollIntoView <$> fmapMaybe id onLoadEvent
 

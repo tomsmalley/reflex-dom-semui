@@ -5,6 +5,8 @@
 -- app.
 module Reflex.Dom.SemanticUI.Warp where
 
+import Data.ByteString (ByteString)
+import Data.ByteString.Char8 (unpack)
 import Control.Lens ((^.))
 import Control.Monad (void)
 import Language.Javascript.JSaddle
@@ -17,37 +19,47 @@ import Network.WebSockets
 import Data.FileEmbed
 
 -- | Start the warp server
-server :: Int -> JSM () -> IO ()
-server port app = do
+server :: Int -> ByteString -> JSM () -> IO ()
+server port css app = do
   putStrLn $ "starting warp server: http://localhost:" ++ show port
-  runApp port app id $ return ()
+  runApp css port app id $ return ()
 
 -- | Restart the warp server and tell any connected clients to refresh
-daemon :: Int -> JSM () -> IO ()
-daemon port app = do
-  debugWrapper (runApp port app)
+daemon :: Int -> ByteString -> JSM () -> IO ()
+daemon port css app = do
+  debugWrapper (runApp css port app)
   putStrLn $ "restarting warp server: http://localhost:" ++ show port
 
 -- | We serve the standard jsaddle-warp app but with a static server for the
--- javascript and theme folder.
-runApp :: Int -> JSM () -> Middleware -> JSM ()-> IO ()
-runApp port mainApp middleware preApp = do
-  print dir
+-- javascript, css, and theme folder.
+runApp :: ByteString -> Int -> JSM () -> Middleware -> JSM ()-> IO ()
+runApp css port mainApp middleware preApp = do
   server <- jsaddleWithAppOr defaultConnectionOptions
     (preApp >> app) (middleware static)
   runSettings settings server
   where
     settings = setPort port $ setTimeout 3600 $ defaultSettings
     static = staticApp $ defaultFileServerSettings dir
-    app = makeHead >> mainApp >> syncPoint
+    app = makeHead css >> mainApp >> syncPoint
     dir = $(strToExp =<< makeRelativeToProject "lib")
 
 -- Needed for non js targets, since the js-sources in the cabal file are not
 -- linked
-makeHead :: JSM ()
-makeHead = do
+makeHead :: ByteString -> JSM ()
+makeHead css = do
 
   document <- jsg "document"
+
+  -- Ugly hacks
+  style <- document ^. js1 "createElement" "style"
+  style ^. jss "innerText" (unpack css)
+  void $ document ^. js "head" ^. js1 "appendChild" style
+
+  semanticCSS <- document ^. js1 "createElement" "link"
+  semanticCSS ^. jss "rel" "stylesheet"
+  semanticCSS ^. jss "type" "text/css"
+  semanticCSS ^. jss "href" "semantic.min.css"
+  void $ document ^. js "head" ^. js1 "appendChild" semanticCSS
 
   jquery <- document ^. js1 "createElement" "script"
   jquery ^. jss "src" "jquery-3.2.1.min.js"

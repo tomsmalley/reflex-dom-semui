@@ -56,7 +56,9 @@ executable example
       base            >= 4.8 && < 4.10
     , example
   if !impl(ghcjs)
-    build-depends: semantic-reflex
+    build-depends:
+        semantic-reflex
+      , file-embed
   ghc-prof-options: -fprof-auto
   ghc-options: -threaded -Wall -fwarn-tabs -funbox-strict-fields -O2 -fno-warn-unused-do-bind
   if impl(ghcjs)

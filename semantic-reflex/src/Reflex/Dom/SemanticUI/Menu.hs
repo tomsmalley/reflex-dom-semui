@@ -139,7 +139,7 @@ data MenuItems t m a (xs :: [Type]) where
   -- | Sub menu
   MenuSub :: HListAppend ys xs => MenuConfig t (Proxy a) -> MenuItems t m a ys -> MenuItems t m a xs -> MenuItems t m a (ys `Append` xs)
   -- | Dropdown item
-  MenuDropdown :: HListAppend ys xs => Text -> MenuItems t m a ys -> MenuItems t m a xs -> MenuItems t m a (ys `Append` xs)
+  MenuDropdown :: Text -> MenuItems t m a '[] -> MenuItems t m a xs -> MenuItems t m a xs
 
 type family Append (as :: [Type]) (bs :: [Type]) :: [Type] where
   Append '[] bs = bs

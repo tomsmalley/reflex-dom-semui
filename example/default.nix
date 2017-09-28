@@ -2,13 +2,14 @@
 , file-embed, ghc-prim, ghcjs-dom, haskell-src-exts
 , haskell-src-meta, hscolour, jsaddle, jsaddle-warp, lens, mtl
 , reflex, reflex-dom-core, semantic-reflex, stdenv, template-haskell, text, these
-, wai, wai-app-static, warp, websockets, ghc
+, wai, wai-app-static, warp, websockets, ghcjs
+, closurecompiler
 }:
-mkDerivation {
+mkDerivation rec {
   pname = "example";
   version = "0.1";
   src = builtins.filterSource (path: type: !(builtins.elem (baseNameOf path)
-    [ "makedocs.sh" "dist" ]
+    [ "makedocs.sh" "dist" "dist-newstyle" ]
   )) ./.;
   isLibrary = true;
   isExecutable = true;
@@ -30,8 +31,7 @@ mkDerivation {
     semantic-reflex
     template-haskell
     text
-  ] ++ (if ghc.isGhcjs or false then [
-  ] else if stdenv.isDarwin then [
+  ] ++ (if ghcjs then [
   ] else [
     jsaddle-warp
     wai-app-static
@@ -40,4 +40,20 @@ mkDerivation {
   ]);
   description = "A reflex-dom API for semantic-ui components";
   license = stdenv.lib.licenses.bsd3;
+  buildTools = [ closurecompiler ];
+  postInstall = stdenv.lib.optionalString ghcjs (''
+    mkdir $out/dist;
+    mkdir $out/dist/js;
+    cp -r ${semantic-reflex}/share/*/*/lib/dist/* $out/dist;
+    echo Running closure compiler...;
+  '' + builtins.replaceStrings ["\n"] [" "] ''
+      closure-compiler
+      --js_output_file $out/dist/js/all.js
+      --externs=$out/bin/${pname}.jsexe/all.js.externs
+      --externs=${semantic-reflex}/share/*/*/lib/jquery.js.externs
+      $out/bin/${pname}.jsexe/all.js
+      -O ADVANCED;
+  '' + ''
+  echo GHCJS build output in result/dist;
+  '');
 }

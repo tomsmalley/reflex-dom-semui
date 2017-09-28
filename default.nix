@@ -1,4 +1,4 @@
-{ reflex-platform ? ../reflex-platform/. }:
+{ reflex-platform ? ../reflex-platform/. , ghcjs ? false }:
 let
 
   dontCheckPackages = [
@@ -15,11 +15,17 @@ let
         };
     in builtins.listToAttrs (map toPackage names);
 
+  manualOverrides = self: super: rec {
+    semantic-reflex = self.callPackage ./semantic-reflex { inherit ghcjs; };
+    example = self.callPackage ./example { inherit semantic-reflex; inherit ghcjs; };
+  };
+
   composeExtensionsList = pkgs.lib.fold pkgs.lib.composeExtensions (_: _: { });
   doOverrides = haskellPackages: haskellPackages.override {
     overrides = composeExtensionsList [
       generatedOverrides
       (makeOverrides pkgs.haskell.lib.dontCheck dontCheckPackages)
+      manualOverrides
     ];
   };
   generatedOverrides = self: super:
@@ -29,23 +35,6 @@ let
         };
     in pkgs.lib.mapAttrs' toPackage (builtins.readDir ./nix);
 
-in rec {
-
-  semantic-reflex = (doOverrides platform.ghc).callPackage ./semantic-reflex {
-    ghcjs = false;
-  };
-
-  semantic-reflex-js = (doOverrides platform.ghcjs).callPackage ./semantic-reflex {
-    ghcjs = true;
-  };
-  ghc = (doOverrides platform.ghc).callPackage ./example {
-    ghc = platform.ghc;
-    inherit semantic-reflex;
-  };
-
-  ghcjs = (doOverrides platform.ghcjs).callPackage ./example {
-    ghc = platform.ghcjs;
-    semantic-reflex = semantic-reflex-js;
-  };
-
-}
+in if ghcjs
+    then (doOverrides platform.ghcjs).callPackage ./example { inherit ghcjs; }
+    else (doOverrides platform.ghc).callPackage ./example { inherit ghcjs; }

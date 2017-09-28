@@ -147,10 +147,14 @@ dropdownConfigClasses DropdownConfig {..} = catMaybes
   ]
 
 -- | Helper function
-indexToItem :: [DropdownItem a] -> Text -> Maybe a
+indexToItem :: [DropdownItem m a] -> Text -> Maybe a
 indexToItem items i' = do
   i <- readMaybe $ T.unpack i'
-  _value <$> items !? i
+  getValue =<< items !? i
+
+getValue :: DropdownItem m a -> Maybe a
+getValue (DropdownItem a _ _) = Just a
+getValue _ = Nothing
 
 -- | Custom Dropdown item configuration
 data DropdownItemConfig = DropdownItemConfig
@@ -171,30 +175,28 @@ instance Default DropdownItemConfig where
     , _flag = Nothing
     }
 
-data DropdownItem a = DropdownItem
-  { _value :: a
-  , _label :: Text
-  , _config :: DropdownItemConfig
-  }
+data DropdownItem m a
+  = DropdownItem a Text DropdownItemConfig
+  | DropdownHeader (Header m a)
 
-data Dropdown f t a = Dropdown
-  { _items :: [DropdownItem a]
+data Dropdown f t m a = Dropdown
+  { _items :: [DropdownItem m a]
   , _config :: DropdownConfig t (f a)
   }
 
-instance (t ~ t', Eq a) => UI t' m (Dropdown Maybe t a) where
-  type Return t' m (Dropdown Maybe t a) = Dynamic t (Maybe a)
+instance (t ~ t', m ~ m', Eq a) => UI t' m' (Dropdown Maybe t m a) where
+  type Return t' m' (Dropdown Maybe t m a) = Dynamic t (Maybe a)
   ui (Dropdown items config@DropdownConfig{..}) = do
     evt <- dropdownInternal items False config
     holdDyn def $ listToMaybe <$> evt
 
-instance (t ~ t', Eq a) => UI t' m (Dropdown [] t a) where
-  type Return t' m (Dropdown [] t a) = Dynamic t [a]
+instance (t ~ t', m ~ m', Eq a) => UI t' m' (Dropdown [] t m a) where
+  type Return t' m' (Dropdown [] t m a) = Dynamic t [a]
   ui (Dropdown items config@DropdownConfig{..}) = do
     holdDyn def =<< dropdownInternal items True config
 
-instance (t ~ t', Eq a) => UI t' m (Dropdown Identity t a) where
-  type Return t' m (Dropdown Identity t a) = Dynamic t a
+instance (t ~ t', m ~ m', Eq a) => UI t' m' (Dropdown Identity t m a) where
+  type Return t' m' (Dropdown Identity t m a) = Dynamic t a
   ui (Dropdown items config@DropdownConfig{..}) = do
     holdDyn (runIdentity _initialValue) . fmap f =<< dropdownInternal items False config'
       where f (a : _) = a
@@ -202,13 +204,14 @@ instance (t ~ t', Eq a) => UI t' m (Dropdown Identity t a) where
             -- Ignore attempts to set the value to an item not in the list
             config' = config { _setValue = ffilter (itemExists items . runIdentity) _setValue }
 
-itemExists :: Eq a => [DropdownItem a] -> a -> Bool
+itemExists :: Eq a => [DropdownItem m a] -> a -> Bool
 itemExists [] _ = False
-itemExists (DropdownItem {..}:as) a = if _value == a then True else itemExists as a
+itemExists (DropdownItem a _ _:as) b = if a == b then True else itemExists as b
 
 -- | Internal function with shared behaviour
-dropdownInternal :: forall t m a f. (Foldable f, MonadWidget t m, Eq a)
-  => [DropdownItem a]             -- ^ Items
+dropdownInternal
+  :: forall t m a f. (Foldable f, MonadWidget t m, Eq a)
+  => [DropdownItem m a]             -- ^ Items
   -> Bool                         -- ^ Is multiple dropdown
   -> DropdownConfig t (f a)       -- ^ Dropdown config
   -> m (Event t [a])
@@ -224,7 +227,7 @@ dropdownInternal items isMulti conf@DropdownConfig {..} = do
     elAttr "i" ("class" =: "dropdown icon") blank
 
     -- Dropdown menu
-    divClass "menu" $ sequence_ $ imap putItem items
+    divClass "menu" $ putItems items
 
   -- Setup the event and callback function for when the value is changed
   (onChangeEvent, onChangeCallback) <- newTriggerEvent
@@ -250,6 +253,14 @@ dropdownInternal items isMulti conf@DropdownConfig {..} = do
     classes = "ui" : "dropdown" : (if isMulti then "multiple" else "") : dropdownConfigClasses conf
     itemDiv i a = elAttr "div"
       ("class" =: "item" <> "data-value" =: tshow i <> a)
+    getIndices :: Foldable f => f a -> [Int]
+    getIndices vs = L.findIndices (`elem` vs) $ mapMaybe getValue items
+
+putItems :: MonadWidget t m => [DropdownItem m a] -> m ()
+putItems items = sequence_ $ imap putItem items
+
+  where
+    _textOnly = False -- TODO FIXME
     putItem i (DropdownItem _ t DropdownItemConfig {..}) =
       let attrs = "class" =: "item" <> "data-value" =: tshow i
                <> dataText
@@ -262,5 +273,7 @@ dropdownInternal items isMulti conf@DropdownConfig {..} = do
           maybe blank ui_ _image
           maybe blank ui_ _flag
           text t
-    getIndices :: Foldable f => f a -> [Int]
-    getIndices vs = L.findIndices ((`elem` vs) . _value) items
+
+
+
+

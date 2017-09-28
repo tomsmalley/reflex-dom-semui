@@ -14,30 +14,25 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 data-files:
-  lib/semantic.min.css
-  lib/themes/default/assets/fonts/icons.eot
-  lib/themes/default/assets/fonts/icons.otf
-  lib/themes/default/assets/fonts/icons.svg
-  lib/themes/default/assets/fonts/icons.ttf
-  lib/themes/default/assets/fonts/icons.woff
-  lib/themes/default/assets/fonts/icons.woff2
-  lib/themes/default/assets/images/flags.png
-  lib/semantic.min.js
-  lib/jquery-3.2.1.min.js
+  lib/dist/semantic.min.css
+  lib/dist/themes/default/assets/fonts/icons.eot
+  lib/dist/themes/default/assets/fonts/icons.otf
+  lib/dist/themes/default/assets/fonts/icons.svg
+  lib/dist/themes/default/assets/fonts/icons.ttf
+  lib/dist/themes/default/assets/fonts/icons.woff
+  lib/dist/themes/default/assets/fonts/icons.woff2
+  lib/dist/themes/default/assets/images/flags.png
+  lib/dist/js/semantic.min.js
+  lib/dist/js/jquery-3.2.1.min.js
+  lib/dist/index.html
+  lib/jquery.js.externs
 
 library
   hs-source-dirs: src
+-- This is disabled due to https://github.com/reflex-frp/reflex-platform/issues/91
 --  js-sources:
---    -- Order is important: jquery is used by semantic but must come after.
 --      lib/semantic.min.js
 --    , lib/jquery-3.2.1.min.js
-
--- closure-compiler
-    --js_output_file main.js
-    --externs=dist-newstyle/../...jsexe/all.js.externs
-    --externs=lib/jquery-3.2.externs.js
---    dist-newstyle/../..jsexe/all.js
---    -O ADVANCED
 
   exposed-modules:
     Reflex.Dom.SemanticUI
