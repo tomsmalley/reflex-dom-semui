@@ -33,7 +33,7 @@ printDefinition preproc name = do
     mode = Exts.defaultParseMode
       { Exts.baseLanguage = Exts.Haskell2010
       , Exts.extensions = Exts.EnableExtension <$>
-          [Exts.TypeFamilies, Exts.ExplicitForAll, Exts.DataKinds, Exts.GADTs, Exts.MultiParamTypeClasses]
+        [Exts.ExistentialQuantification, Exts.TypeFamilies, Exts.ExplicitForAll, Exts.DataKinds, Exts.GADTs, Exts.MultiParamTypeClasses]
       }
     style' = Exts.style { Exts.lineLength = 600, Exts.ribbonsPerLine = 1 }
     parse = Exts.parseDeclWithMode mode . stripForAll . stripTypes . stripNumbers . stripModules . preproc . pprint

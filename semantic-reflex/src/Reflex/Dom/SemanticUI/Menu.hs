@@ -30,11 +30,12 @@ import qualified Data.Text as T
 import Data.These
 import           Language.Javascript.JSaddle (liftJSM, js0)
 import           Reflex
-import           Reflex.Dom.Core hiding (Link, value)
+import           Reflex.Dom.Core hiding (Dropdown(..), Link, value, Select)
 import Data.Align
 
 import Reflex.Dom.SemanticUI.Icon
 import Reflex.Dom.SemanticUI.Common
+import Reflex.Dom.SemanticUI.Dropdown
 
 data MenuConfig t a = MenuConfig
   { _initialValue :: a
@@ -58,12 +59,13 @@ instance Reflex t => Applicative (MenuConfig t) where
     , _customMenu = Nothing
     , _floated = Nothing
     }
-  mcf <*> mca = mca
-    { _initialValue = (_initialValue mcf) (_initialValue mca)
-    , _setValue = fmapMaybe id
-        $ fmap (these (const Nothing) (const Nothing) (\f a -> Just $ f a))
-        $ align (_setValue mcf) (_setValue mca)
-    }
+  MenuConfig { _initialValue = fInit, _setValue = fEvt }
+    <*> mca@MenuConfig { _initialValue = aInit, _setValue = aEvt } = mca
+      { _initialValue = fInit aInit
+      , _setValue = fmapMaybe id
+          $ fmap (these (const Nothing) (const Nothing) (\f a -> Just $ f a))
+          $ align fEvt aEvt
+      }
 
 instance Reflex t => Default (MenuConfig t (Maybe a)) where
   def = pure Nothing
@@ -124,17 +126,17 @@ data MenuItems t m a (xs :: [Type]) where
   -- | Sub widget, ignoring the value
   UIContent_ :: Part t m b => b -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a xs
   -- | Sub item widget, capturing the value
-  UIItemContent :: (Return t m b ~ rb, Item b, UI t m b) => b -> MenuItems t m a xs -> MenuItems t m a (rb ': xs)
+  UIItemContent :: (Return t m b ~ rb, ToItem b, UI t m b) => b -> MenuItems t m a xs -> MenuItems t m a (rb ': xs)
   -- | Sub item widget, ignoring the value
-  UIItemContent_ :: (Item b, UI t m b) => b -> MenuItems t m a xs -> MenuItems t m a xs
+  UIItemContent_ :: (ToItem b, UI t m b) => b -> MenuItems t m a xs -> MenuItems t m a xs
   -- | Sub widget, capturing the value
   MenuWidget :: m b -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a (b ': xs)
   -- | Arbitrary widget, ignoring the value
   MenuWidget_ :: m b -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a xs
   -- | Sub menu
   MenuSub :: HListAppend ys xs => MenuConfig t (Proxy a) -> MenuItems t m a ys -> MenuItems t m a xs -> MenuItems t m a (ys `Append` xs)
-  -- | Dropdown item
-  MenuDropdown :: Text -> MenuItems t m a '[] -> MenuItems t m a xs -> MenuItems t m a xs
+  -- | Dropdown menu
+  DropdownMenu :: Text -> [DropdownItem t m a] -> MenuItems t m a xs -> MenuItems t m a xs
 
 type family Append (as :: [Type]) (bs :: [Type]) :: [Type] where
   Append '[] bs = bs
@@ -213,6 +215,7 @@ renderItems
 renderItems allItems currentValue = go False allItems
   where
     selected = demux currentValue
+    updatedValue = updated currentValue
 
     itemElAttrs :: MenuItemConfig -> (Text, Map Text Text)
     itemElAttrs conf@MenuItemConfig{..} = case _link of
@@ -270,18 +273,15 @@ renderItems allItems currentValue = go False allItems
         ui_ $ toItem uiElem
         go inDropdown rest
 
-      MenuDropdown label sub rest -> do
-        (e, (subEvents, subList)) <- elClass' "div" (T.unwords classes) $ do
-          ui_ $ Icon "dropdown" def -- icon must come first for sub dropdowns
-          text label
-          divClass "menu" $ go True sub
-        -- Only do this on the top level dropdown!
-        unless inDropdown $ void $ liftJSM $ jQuery (_element_raw e) ^. js0 ("dropdown" :: Text)
+      DropdownMenu label items rest -> do
+        dynVal <- ui $ Dropdown items $ (pure Nothing)
+          { _item = True
+          , _setValue = updatedValue
+          , _action = Select
+          , _placeholder = label
+          }
         (restEvents, restList) <- go inDropdown rest
-        return (restEvents ++ subEvents, subList `hlistAppend` restList)
-          where classes = if inDropdown
-                          then ["item"]
-                          else "ui" : "dropdown" : "item" : []
+        return (fmapMaybe id (updated dynVal) : restEvents, restList)
 
       SubMenu mkItem sub rest -> do
         (subEvents, subList) <- divClass "item" $ do

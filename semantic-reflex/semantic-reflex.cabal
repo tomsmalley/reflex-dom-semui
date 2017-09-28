@@ -21,7 +21,7 @@ data-files:
   lib/dist/themes/default/assets/fonts/icons.woff2
   lib/dist/themes/default/assets/images/flags.png
   lib/dist/js/semantic.min.js
-  lib/dist/js/jquery-3.2.1.min.js
+  lib/dist/js/jquery.min.js
   lib/dist/index.html
   lib/jquery.js.externs
 

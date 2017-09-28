@@ -84,7 +84,7 @@ ui_ = void . ui
 part_ :: (MonadWidget t m, Part t m a) => a -> m ()
 part_ = void . part
 
-class Item a where
+class ToItem a where
   toItem :: a -> a
 
 class (ToPart a, UI t m a) => Part t m a where

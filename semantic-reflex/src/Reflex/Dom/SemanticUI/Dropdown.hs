@@ -9,6 +9,8 @@
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE GADTs     #-}
+{-# LANGUAGE LambdaCase     #-}
 
 module Reflex.Dom.SemanticUI.Dropdown
   (
@@ -19,6 +21,8 @@ module Reflex.Dom.SemanticUI.Dropdown
 
   , DropdownItem (..)
   , DropdownItemConfig (..)
+
+  , Divider(..)
   ) where
 
 import           Control.Monad
@@ -146,14 +150,20 @@ dropdownConfigClasses DropdownConfig {..} = catMaybes
   ]
 
 -- | Helper function
-indexToItem :: [DropdownItem m a] -> Text -> Maybe a
+indexToItem :: [DropdownItem t m a] -> Text -> Maybe a
 indexToItem items i' = do
   i <- readMaybe $ T.unpack i'
-  getValue =<< items !? i
+  getItemAt i items
 
-getValue :: DropdownItem m a -> Maybe a
-getValue (DropdownItem a _ _) = Just a
-getValue _ = Nothing
+toValues :: [DropdownItem t m a] -> [a]
+toValues [] = []
+toValues (item:items) = case item of
+  DropdownItem a _ _ -> a : toValues items
+  Items _ items' -> toValues items' ++ toValues items
+  Content _ -> toValues items
+
+getItemAt :: Int -> [DropdownItem t m a] -> Maybe a
+getItemAt i items = toValues items !? i
 
 -- | Custom Dropdown item configuration
 data DropdownItemConfig = DropdownItemConfig
@@ -174,12 +184,71 @@ instance Default DropdownItemConfig where
     , _flag = Nothing
     }
 
-data DropdownItem m a
-  = DropdownItem a Text DropdownItemConfig
-  | DropdownHeader (Header m a)
+data DropdownItem t m a where
+  DropdownItem :: a -> Text -> DropdownItemConfig -> DropdownItem t m a
+  Content :: (UI t m b, ToDropdownItem b) => b -> DropdownItem t m a
+  Items :: Text -> [DropdownItem t m a] -> DropdownItem t m a
+
+class ToDropdownItem a where
+  toDropdownItem :: a -> a
+
+data Divider = Divider
+
+instance UI t m Divider where
+  type Return t m Divider = ()
+  ui' Divider = elClass' "div" "divider" blank
+
+instance ToDropdownItem (Header m a) where
+  toDropdownItem (Header size content config) = Header size content $
+    config { _header = ContentHeader, _component = False }
+
+instance ToDropdownItem Divider where
+  toDropdownItem Divider = Divider
+--
+-- TODO
+-- Selection is incompatible with sub menus.
+-- Sections of menu can be scrolling, this is also incompatible with sub menus.
+-- Search input in menu
+-- Dividers
+
+putItems :: forall t m a. MonadWidget t m => [DropdownItem t m a] -> m ()
+putItems items = void $ go 0 items
+
+  where
+    _textOnly = False -- TODO FIXME
+
+    go :: Int -> [DropdownItem t m a] -> m Int
+    go i = \case
+
+      [] -> return i
+
+      (DropdownItem _ t DropdownItemConfig {..} : rest) -> do
+        let attrs = "class" =: "item" <> "data-value" =: tshow i
+                <> dataText
+            dataText
+              | Just dt <- _dataText = "data-text" =: dt
+              | _textOnly = "data-text" =: t
+              | otherwise = mempty
+        elAttr "div" attrs $ do
+          maybe blank ui_ _icon
+          maybe blank ui_ _image
+          maybe blank ui_ _flag
+          text t
+
+        go (i + 1) rest
+
+      (Content a : rest) -> ui_ (toDropdownItem a) >> go i rest
+
+      (Items label sub : rest) -> do
+        i' <- divClass "item" $ do
+          ui_ $ Icon "dropdown" def -- icon must come first for sub dropdowns
+          text label
+          divClass "menu" $ go i sub
+        go i' rest
+
 
 data Dropdown f t m a = Dropdown
-  { _items :: [DropdownItem m a]
+  { _items :: [DropdownItem t m a]
   , _config :: DropdownConfig t (f a)
   }
 
@@ -205,17 +274,12 @@ instance (t ~ t', m ~ m', Eq a) => UI t' m' (Dropdown Identity t m a) where
       where f (a : _) = a
             f _ = runIdentity _initialValue
             -- Ignore attempts to set the value to an item not in the list
-            config' = config { _setValue = ffilter (itemExists items . runIdentity) _setValue }
-
-itemExists :: Eq a => [DropdownItem m a] -> a -> Bool
-itemExists [] _ = False
-itemExists (DropdownItem a _ _:as) b = if a == b then True else itemExists as b
-itemExists (_:as) b = itemExists as b
+            config' = config { _setValue = ffilter (flip elem (toValues items) . runIdentity) _setValue }
 
 -- | Internal function with shared behaviour
 dropdownInternal
   :: forall t m a f. (Foldable f, MonadWidget t m, Eq a)
-  => [DropdownItem m a]             -- ^ Items
+  => [DropdownItem t m a]             -- ^ Items
   -> Bool                         -- ^ Is multiple dropdown
   -> DropdownConfig t (f a)       -- ^ Dropdown config
   -> m (El t, Event t [a])
@@ -256,28 +320,4 @@ dropdownInternal items isMulti conf@DropdownConfig {..} = do
     maxSel = if isMulti then _maxSelections else Nothing
     classes = "ui" : "dropdown" : (if isMulti then "multiple" else "") : dropdownConfigClasses conf
     getIndices :: Foldable f => f a -> [Int]
-    getIndices vs = L.findIndices (`elem` vs) $ mapMaybe getValue items
-
-putItems :: MonadWidget t m => [DropdownItem m a] -> m ()
-putItems items = sequence_ $ imap putItem items
-
-  where
-    _textOnly = False -- TODO FIXME
-    putItem i (DropdownItem _ t DropdownItemConfig {..}) =
-      let attrs = "class" =: "item" <> "data-value" =: tshow i
-               <> dataText
-          dataText
-            | Just dt <- _dataText = "data-text" =: dt
-            | _textOnly = "data-text" =: t
-            | otherwise = mempty
-      in elAttr "div" attrs $ do
-          maybe blank ui_ _icon
-          maybe blank ui_ _image
-          maybe blank ui_ _flag
-          text t
-    -- TODO FIXME
-    putItem _ _ = return ()
-
-
-
-
+    getIndices vs = L.findIndices (`elem` vs) $ toValues items

@@ -165,6 +165,28 @@ dropdowns = LinkedSection "Dropdown" "" $ do
   $(printDefinition stripParens ''Dropdown)
   el "p" $ text "The standard dropdown returns a Maybe to signify the possibility of no selection. However, if you specify an initial value, the user will be unable to deselect it. In this case you can clear the value with 'setValue' by passing 'Nothing'."
 
+  exampleCardDyn id "Single value" "" [mkExample|
+  \resetEvent -> do
+    ui $ Dropdown
+      [ Content $ Header H3 (text "One Or Two") def
+      , Content Divider
+      , DropdownItem (1 :: Int) "One" def
+      , DropdownItem 2 "Two" def
+      , Content $ Header H2 (text "Greater Than Three") def
+      , Content Divider
+      , Items "More"
+        [ DropdownItem 3 "Three" def
+        , DropdownItem 4 "Four" def
+        , DropdownItem 5 "Five" def
+        ]
+      , DropdownItem 6 "Six" def
+      , DropdownItem 7 "Seven" def
+      , DropdownItem 8 "Eight" def
+      ] $ pure Nothing
+        & placeholder .~ "Pick a number"
+        & setValue .~ (Nothing <$ resetEvent)
+  |]
+
   divClass "ui two column stackable grid" $ do
     divClass "row" $ do
 
@@ -229,8 +251,9 @@ dropdowns = LinkedSection "Dropdown" "" $ do
           ui $ Header H4 ( do
             text "Trending repos "
             ui $ Dropdown
-              -- [ DropdownHeader "Adjust time span" def
-              [ DropdownItem "daily" "Today" $ def & dataText ?~ "today"
+              [ Content $ Header H1 (text "Adjust time span") def
+              , Content Divider
+              , DropdownItem "daily" "Today" $ def & dataText ?~ "today"
               , DropdownItem "weekly" "This Week" $ def & dataText ?~ "this week"
               , DropdownItem "monthly" "This Month" $ def & dataText ?~ "this month"
               ]
@@ -359,25 +382,25 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
         ( MenuItem "Search" (constDyn $ text "Search") def
         $ MenuItem "Add" (constDyn $ text "Add") def
         $ MenuItem "Remove" (constDyn $ text "Remove") def
-        $ MenuDropdown "More"
-          ( MenuItem "Edit" (constDyn $ text "Edit") def
-          $ MenuItem "Tag" (constDyn $ text "Tag") def
-          $ MenuBase )
+        $ DropdownMenu "More"
+          [ DropdownItem "Edit" "Edit" def
+          , DropdownItem "Tag" "Tag" def
+          ]
         $ MenuBase )
       $ MenuItem "Browse" (constDyn $ do
           ui $ Icon "grid layout" def
           text "Browse"
         ) def
       $ MenuItem "Messages" (constDyn $ text "Messages") def
-      $ MenuDropdown "More"
-        ( MenuItem "Edit Profile" (constDyn $ ui (Icon "edit" def) >> text "Edit Profile") def
-        $ MenuItem "Choose Language" (constDyn $ ui (Icon "globe" def) >> text "Choose Language") def
-        $ MenuItem "Account Settings" (constDyn $ ui (Icon "settings" def) >> text "Account Settings") def
-        $ MenuDropdown "Even More"
-          ( MenuItem "Contact Us" (constDyn $ ui (Icon "talk" def) >> text "Contact Us") def
-          $ MenuItem "Make a Suggestion" (constDyn $ ui (Icon "idea" def) >> text "Make a Suggestion") def
-          $ MenuBase )
-        $ MenuBase )
+      $ DropdownMenu "More"
+        [ DropdownItem "Edit Profile" "Edit Profile" $ def & icon ?~ Icon "edit" def
+        , DropdownItem "Choose Language" "Choose Language" $ def & icon ?~ Icon "globe" def
+        , DropdownItem "Account Settings" "Account Settings" $ def & icon ?~ Icon "settings" def
+        , Items "Even More"
+          [ DropdownItem "Contact Us" "Contact Us" $ def & icon ?~ Icon "talk" def
+          , DropdownItem "Make a Suggestion" "Make a Suggestion" $ def & icon ?~ Icon "idea" def
+          ]
+        ]
       $ MenuBase )
       $ def & vertical .~ True
             & setValue .~ (Nothing <$ resetEvent)

@@ -136,7 +136,7 @@ data Header m a = Header
   , _config :: HeaderConfig m
   }
 
-instance Item (Header m a) where
+instance ToItem (Header m a) where
   toItem (Header size content config) = Header size content $
     config { _item = True, _component = False }
 
