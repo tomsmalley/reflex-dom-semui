@@ -34,7 +34,6 @@ import           Reflex.Dom.SemanticUI.Icon
 data UiButton = UiButton
     { _uiButton_emphasis   :: Maybe UiEmphasis
     , _uiButton_color      :: Maybe UiColor
-    , _uiButton_basic      :: Maybe UiBasic
     , _uiButton_inverted   :: Maybe UiInverted
     , _uiButton_activation :: Maybe (Either UiActive UiDisabled)
     -- ^ active and disabled should be mutually exclusive so we use an Either
@@ -49,16 +48,13 @@ data UiButton = UiButton
     } deriving (Eq,Show)
 
 instance Default UiButton where
-  def = UiButton def def def def def def def def def def def def def
+  def = UiButton def def def def def def def def def def def def
 
 instance UiHasColor UiButton where
   uiSetColor c b = b { _uiButton_color = Just c }
 
 instance UiHasEmphasis UiButton where
   uiSetEmphasis e b = b { _uiButton_emphasis = Just e }
-
-instance UiHasBasic UiButton where
-  basic b = b { _uiButton_basic = Just UiBasic }
 
 instance UiHasInverted UiButton where
   inverted b = b { _uiButton_inverted = Just UiInverted }
@@ -100,7 +96,6 @@ uiButtonAttrs :: UiButton -> Text
 uiButtonAttrs UiButton{..} = T.unwords $ catMaybes
     [ uiText <$> _uiButton_emphasis
     , uiText <$> _uiButton_color
-    , uiText <$> _uiButton_basic
     , uiText <$> _uiButton_inverted
     , uiText <$> _uiButton_activation
     , uiText <$> _uiButton_size

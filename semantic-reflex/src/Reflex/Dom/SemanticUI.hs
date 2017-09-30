@@ -8,7 +8,9 @@ module Reflex.Dom.SemanticUI
   , module Reflex.Dom.SemanticUI.Common
   , module Reflex.Dom.SemanticUI.Dropdown
   , module Reflex.Dom.SemanticUI.Icon
+  , module Reflex.Dom.SemanticUI.Image
   , module Reflex.Dom.SemanticUI.Input
+  , module Reflex.Dom.SemanticUI.Label
   , module Reflex.Dom.SemanticUI.Menu
   , module Reflex.Dom.SemanticUI.Header
   , module Reflex.Dom.SemanticUI.Lenses
@@ -22,11 +24,13 @@ module Reflex.Dom.SemanticUI
 import           Data.ByteString
 import           Reflex.Dom.SemanticUI.Button
 import           Reflex.Dom.SemanticUI.Checkbox
-import           Reflex.Dom.SemanticUI.Common (basic, mini, compact, rightFloated, custom, tshow, Color (..), Size (..), small, ui, Floated(..), Part (..), jQuery, consoleLog, catchJS)
+import           Reflex.Dom.SemanticUI.Common (mini, compact, rightFloated, custom, tshow, Color (..), Size (..), small, ui, ui', ui_, Floated(..), Part (..), part, jQuery, consoleLog, consoleTime, consoleTimeEnd, catchJS, Active (..), RenderWhen(..), alwaysRender, (|~), (|?~), HorizontalAttached (..), VerticalAttached (..))
 import           Reflex.Dom.SemanticUI.Dropdown
 import           Reflex.Dom.SemanticUI.Header
 import           Reflex.Dom.SemanticUI.Icon
+import           Reflex.Dom.SemanticUI.Image
 import           Reflex.Dom.SemanticUI.Input
+import Reflex.Dom.SemanticUI.Label
 import           Reflex.Dom.SemanticUI.Menu
 import           Reflex.Dom.SemanticUI.Lenses
 import           Reflex.Dom.SemanticUI.Modal

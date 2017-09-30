@@ -48,6 +48,7 @@ import           Reflex.Dom.Core hiding
 ------------------------------------------------------------------------------
 import           Reflex.Dom.SemanticUI.Common
 import           Reflex.Dom.SemanticUI.Icon
+import           Reflex.Dom.SemanticUI.Image
 import           Reflex.Dom.SemanticUI.Header
 ------------------------------------------------------------------------------
 
@@ -62,7 +63,10 @@ instance ToJSVal DropdownAction where
   toJSVal action = valMakeString $ case action of
     Activate -> "activate"
     Combo -> "combo"
-    Select -> "select"
+    -- Select doesn't seem to work, so we use activate and prevent the text from
+    -- being set in the dropdown element by removing the wrapping "default text"
+    -- div around the placeholder.
+    Select -> "activate"
     Hide -> "hide"
 
 ------------------------------------------------------------------------------
@@ -110,7 +114,7 @@ data DropdownConfig t a = DropdownConfig
   } deriving Functor
 
 -- TODO check that this is lawful
-instance (Reflex t) => Applicative (DropdownConfig t) where
+instance Reflex t => Applicative (DropdownConfig t) where
   pure a = DropdownConfig
     { _initialValue = a
     , _setValue = never
@@ -134,10 +138,10 @@ instance (Reflex t) => Applicative (DropdownConfig t) where
         $ align (_setValue f) (_setValue a)
     }
 
-instance (Reflex t) => Default (DropdownConfig t (Maybe a)) where
+instance Reflex t => Default (DropdownConfig t (Maybe a)) where
   def = pure Nothing
 
-instance (Reflex t) => Default (DropdownConfig t [a]) where
+instance Reflex t => Default (DropdownConfig t [a]) where
   def = pure []
 
 dropdownConfigClasses :: DropdownConfig t a -> [Text]
@@ -166,17 +170,17 @@ getItemAt :: Int -> [DropdownItem t m a] -> Maybe a
 getItemAt i items = toValues items !? i
 
 -- | Custom Dropdown item configuration
-data DropdownItemConfig = DropdownItemConfig
-  { _icon :: Maybe Icon
-  , _image :: Maybe Image
+data DropdownItemConfig t = DropdownItemConfig
+  { _icon :: Maybe (Icon t)
+  , _image :: Maybe (Image t)
   , _dataText :: Maybe Text
-  , _flag :: Maybe Flag
+  , _flag :: Maybe (Flag t)
   }
 --  { dataText :: T.Text
 --    -- ^ dataText (shown for the selected item)
 --  , _
 --  }
-instance Default DropdownItemConfig where
+instance Default (DropdownItemConfig t) where
   def = DropdownItemConfig
     { _icon = Nothing
     , _image = Nothing
@@ -185,7 +189,7 @@ instance Default DropdownItemConfig where
     }
 
 data DropdownItem t m a where
-  DropdownItem :: a -> Text -> DropdownItemConfig -> DropdownItem t m a
+  DropdownItem :: a -> Text -> (DropdownItemConfig t) -> DropdownItem t m a
   Content :: (UI t m b, ToDropdownItem b) => b -> DropdownItem t m a
   Items :: Text -> [DropdownItem t m a] -> DropdownItem t m a
 
@@ -198,7 +202,7 @@ instance UI t m Divider where
   type Return t m Divider = ()
   ui' Divider = elClass' "div" "divider" blank
 
-instance ToDropdownItem (Header m a) where
+instance ToDropdownItem (Header t m a) where
   toDropdownItem (Header size content config) = Header size content $
     config { _header = ContentHeader, _component = False }
 
@@ -241,7 +245,7 @@ putItems items = void $ go 0 items
 
       (Items label sub : rest) -> do
         i' <- divClass "item" $ do
-          ui_ $ Icon "dropdown" def -- icon must come first for sub dropdowns
+          ui_ $ Icon (pure "dropdown") def -- icon must come first for sub dropdowns
           text label
           divClass "menu" $ go i sub
         go i' rest

@@ -7,11 +7,11 @@
 module Example.QQ where
 
 import Language.Haskell.TH (ExpQ, reify, pprint, runIO)
-import Language.Haskell.TH.Syntax (Name)
+import Language.Haskell.TH.Syntax (Name, Exp(LitE))
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
 import qualified Language.Haskell.Exts as Exts
 -- For parsing the haskell strings to template-haskell AST
-import Language.Haskell.Meta (parseExp)
+import Language.Haskell.Meta (parseExp, parseResultToEither, toExp)
 import Language.Haskell.Meta.Utils (eitherQ)
 
 import Data.Char (isUpper, isAlpha, isAlphaNum, isNumber)
@@ -25,6 +25,20 @@ import Reflex.Dom.SemanticUI hiding (parseType)
 import Data.Text (Text)
 import qualified Data.Text as T
 
+mymode = Exts.defaultParseMode
+    { Exts.baseLanguage = Exts.Haskell2010
+    , Exts.extensions = Exts.EnableExtension <$>
+      [ Exts.ExistentialQuantification
+      , Exts.TypeFamilies
+      , Exts.ExplicitForAll
+      , Exts.DataKinds
+      , Exts.GADTs
+      , Exts.MultiParamTypeClasses
+      , Exts.RecordWildCards
+      , Exts.RecursiveDo
+      , Exts.ScopedTypeVariables
+      ]
+    }
 -- | Pretty print the definition of a haskell type
 printDefinition :: (String -> String) -> Name -> ExpQ
 printDefinition preproc name = do
@@ -33,7 +47,7 @@ printDefinition preproc name = do
     mode = Exts.defaultParseMode
       { Exts.baseLanguage = Exts.Haskell2010
       , Exts.extensions = Exts.EnableExtension <$>
-        [Exts.ExistentialQuantification, Exts.TypeFamilies, Exts.ExplicitForAll, Exts.DataKinds, Exts.GADTs, Exts.MultiParamTypeClasses]
+        [Exts.ExistentialQuantification, Exts.TypeFamilies, Exts.ExplicitForAll, Exts.DataKinds, Exts.GADTs, Exts.MultiParamTypeClasses, Exts.RecordWildCards, Exts.RecursiveDo]
       }
     style' = Exts.style { Exts.lineLength = 600, Exts.ribbonsPerLine = 1 }
     parse = Exts.parseDeclWithMode mode . stripForAll . stripTypes . stripNumbers . stripModules . preproc . pprint
@@ -123,7 +137,7 @@ minSpaces = minimum . map (length . takeWhile (== ' ')) . filter (/= "")
 
 mkExample :: QuasiQuoter
 mkExample = QuasiQuoter
-  { quoteExp = \ex -> [|(ex, $(eitherQ id $ parseExp $ "do\n" ++ ex))|]
+  { quoteExp = \ex -> [|(ex, $(return $ toExp $ Exts.fromParseResult $ Exts.parseExpWithMode mymode $ "do\n" ++ ex))|]
   , quotePat = const $ error "ex: not an expression"
   , quoteType = const $ error "ex: not an expression"
   , quoteDec = const $ error "ex: not an expression"

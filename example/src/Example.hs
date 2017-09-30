@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE DataKinds   #-}
+{-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS_GHC -Wno-name-shadowing -Wno-unused-do-bind #-}
 
@@ -15,7 +16,7 @@ module Example (example) where
 
 import GHC.Tuple
 import Control.Lens
-import Control.Monad ((<=<), void, when, forM_)
+import Control.Monad ((<=<), void, when, forM_, join, replicateM_, guard)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -195,7 +196,7 @@ dropdowns = LinkedSection "Dropdown" "" $ do
         \resetEvent -> do
           clearEvent <- uiButton (custom "left attached" <$> def) $ text "Clear Value"
           let mkItem card = DropdownItem card (showCard card) $ def
-                & icon ?~ Icon (T.toLower $ tshow card) def
+                & icon ?~ Icon (pure . T.toLower $ tshow card) def
               cards = map mkItem [minBound..maxBound]
           ui $ Dropdown cards
             $ def & placeholder .~ "Card Type"
@@ -208,8 +209,8 @@ dropdowns = LinkedSection "Dropdown" "" $ do
         exampleCardDyn id "Single value, search" "" [mkExample|
         \resetEvent -> do
           let mkItem contact = DropdownItem contact (showContact contact) $ def
-                & image ?~ Image (src contact) (def & size ?~ Mini & avatar .~ True)
-              src contact = "http://semantic-ui.com/images/avatar/small/"
+                & image ?~ Image (src contact) (def & size |?~ Mini & avatar |~ True)
+              src contact = pure $ "http://semantic-ui.com/images/avatar/small/"
                           <> T.toLower (tshow contact) <> ".jpg"
               contacts = map mkItem [minBound..maxBound]
           ui $ Dropdown contacts
@@ -233,8 +234,8 @@ dropdowns = LinkedSection "Dropdown" "" $ do
         exampleCardDyn id "Single value inline menu" "A dropdown can be formatted to appear inline in other content" [mkExample|
         \resetEvent -> el "span" $ do
           let mkItem contact = DropdownItem contact (showContact contact) $ def
-                & image ?~ Image (src contact) (def & avatar .~ True)
-              src contact = "https://semantic-ui.com/images/avatar/small/"
+                & image ?~ Image (src contact) (def & avatar |~ True)
+              src contact = pure $ "https://semantic-ui.com/images/avatar/small/"
                           <> T.toLower (tshow contact) <> ".jpg"
               contacts = map mkItem [minBound..maxBound]
           text $ "Show me posts by "
@@ -271,7 +272,7 @@ dropdowns = LinkedSection "Dropdown" "" $ do
         exampleCardDyn id "Multi value" "" [mkExample|
         \resetEvent -> do
           let mkItem card = DropdownItem card (showCard card) $ def
-                & icon ?~ Icon (T.toLower $ tshow card) def
+                & icon ?~ Icon (pure . T.toLower $ tshow card) def
               cards = map mkItem [minBound..maxBound]
           ui $ Dropdown cards
             $ def & placeholder .~ "Card Type"
@@ -284,9 +285,9 @@ dropdowns = LinkedSection "Dropdown" "" $ do
         exampleCardDyn id "Multi value, full-text search" "" [mkExample|
         \resetEvent -> do
           let mkItem contact = DropdownItem contact (showContact contact) $ def
-                & image ?~ Image (src contact) (def & size ?~ Mini & avatar .~ True)
+                & image ?~ Image (src contact) (def & size |?~ Mini & avatar |~ True)
                 & dataText ?~ (T.unwords $ take 1 $ T.words $ showContact contact)
-              src contact = "http://semantic-ui.com/images/avatar/small/"
+              src contact = pure $ "http://semantic-ui.com/images/avatar/small/"
                           <> T.toLower (tshow contact) <> ".jpg"
               contacts = map mkItem [minBound..maxBound]
           ui $ Dropdown contacts
@@ -316,7 +317,7 @@ dropdowns = LinkedSection "Dropdown" "" $ do
         exampleCardDyn id "Multi value, search, hidden labels " "" [mkExample|
         \resetEvent -> do
           let mkItem country = DropdownItem country (countryText country) $ def
-                & flag ?~ Flag (T.toLower $ T.pack $ show country)
+                & flag ?~ Flag (pure $ T.toLower $ T.pack $ show country)
               countries = map mkItem [minBound..maxBound]
           ui $ Dropdown countries
             $ def & placeholder .~ "Country"
@@ -327,6 +328,21 @@ dropdowns = LinkedSection "Dropdown" "" $ do
         |]
 
   return ()
+
+flags :: MonadWidget t m => Section m
+flags = LinkedSection "Flag" "A flag is used to represent a political state" $ do
+
+  el "p" $ do
+    text "For available flag types, see "
+    elAttr "a" ("href" =: "https://semantic-ui.com/elements/flag.html")
+      $ text "the Semantic UI docs"
+    text "."
+
+  $(printDefinition id ''Flag)
+
+  exampleCard "Flag" "" [mkExample|
+  mapM_ (ui . Flag . pure . T.toLower . T.pack . show) [minBound .. maxBound :: CountryEnum]
+  |]
 
 data Favourite
   = Haskell
@@ -341,7 +357,7 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
 
   $(printDefinition stripParens ''Menu)
   $(printDefinition stripParens ''MenuDef)
---  $(printDefinition id ''MenuItems)
+  $(printDefinition id ''MenuItems)
 
   $(printDefinition stripParens ''MenuConfig)
   $(printDefinition stripParens ''MenuItemConfig)
@@ -350,21 +366,21 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
   \resetEvent -> do
     (selected, HNil) <- ui $ Menu
       ( SubMenu (constDyn $ part $ Header H3 (text "Products") $ def & header .~ ContentHeader)
-        ( MenuItem "Enterprise" (constDyn $ text "Enterprise") def
-        $ MenuItem "Consumer" (constDyn $ text "Consumer") def
+        ( MenuItem "Enterprise" "Enterprise" def
+        $ MenuItem "Consumer" "Consumer" def
         $ MenuBase )
       $ SubMenu (constDyn $ part $ Header H3 (text "CMS Solutions") $ def & header .~ ContentHeader)
-        ( MenuItem "Rails" (constDyn $ text "Rails") def
-        $ MenuItem "Python" (constDyn $ text "Python") def
-        $ MenuItem "PHP" (constDyn $ text "PHP") def
+        ( MenuItem "Rails" "Rails" def
+        $ MenuItem "Python" "Python" def
+        $ MenuItem "PHP" "PHP" def
         $ MenuBase )
       $ SubMenu (constDyn $ part $ Header H3 (text "Hosting") $ def & header .~ ContentHeader)
-        ( MenuItem "Shared" (constDyn $ text "Shared") def
-        $ MenuItem "Dedicated" (constDyn $ text "Dedicated") def
+        ( MenuItem "Shared" "Shared" def
+        $ MenuItem "Dedicated" "Dedicated" def
         $ MenuBase )
       $ SubMenu (constDyn $ part $ Header H3 (text "Support") $ def & header .~ ContentHeader)
-        ( MenuItem "E-mail Support" (constDyn $ text "E-mail Support") def
-        $ MenuItem "FAQs" (constDyn $ text "FAQs") def
+        ( MenuItem "E-mail Support" "E-mail Support" def
+        $ MenuItem "FAQs" "FAQs" def
         $ MenuBase )
       $ MenuBase )
       $ def & vertical .~ True & setValue .~ (Nothing <$ resetEvent)
@@ -379,19 +395,16 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
           return $ _textInput_value ti
         ) def
       $ SubMenu (constDyn $ text "Home")
-        ( MenuItem "Search" (constDyn $ text "Search") def
-        $ MenuItem "Add" (constDyn $ text "Add") def
-        $ MenuItem "Remove" (constDyn $ text "Remove") def
+        ( MenuItem "Search" "Search" def
+        $ MenuItem "Add" "Add" def
+        $ MenuItem "Remove" "Remove" def
         $ DropdownMenu "More"
           [ DropdownItem "Edit" "Edit" def
           , DropdownItem "Tag" "Tag" def
           ]
         $ MenuBase )
-      $ MenuItem "Browse" (constDyn $ do
-          ui $ Icon "grid layout" def
-          text "Browse"
-        ) def
-      $ MenuItem "Messages" (constDyn $ text "Messages") def
+      $ MenuItem "Browse" "Browse" (def & icon ?~ Icon "grid layout" def)
+      $ MenuItem "Messages" "Messages" def
       $ DropdownMenu "More"
         [ DropdownItem "Edit Profile" "Edit Profile" $ def & icon ?~ Icon "edit" def
         , DropdownItem "Choose Language" "Choose Language" $ def & icon ?~ Icon "globe" def
@@ -410,7 +423,7 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
   exampleCardDyn id "Arbitrary Widgets" "An item may contain an arbitrary widget with optional capture of the result" [mkExample|
   \resetEvent -> do
     let makeHeader doIcon txt = elAttr "div" ("style" =: "margin-bottom: 0.7em") $ do
-          when doIcon $ void $ ui $ Icon "external" $ def & floated ?~ RightFloated
+          when doIcon $ void $ ui $ Icon "external" $ def & floated |?~ RightFloated
           elAttr "span" ("style" =: "font-weight: bold; text-size: 1.1em") $ text txt
         favs = map (\x -> DropdownItem (T.toLower x) x def) ["Haskell", "Semantic UI", "Reflex"]
     -- Type signature required or the value is ambiguous
@@ -443,14 +456,13 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
   exampleCardDyn id "Secondary Menu" "A menu can adjust its appearance to de-emphasize its contents" [mkExample|
   \resetEvent -> do
     (selected, search `HCons` _) <- ui $ MenuDef
-      ( MenuItem "Home" (constDyn $ text "Home") def
-      $ MenuItem "Messages" (constDyn $ text "Messages") def
-      $ MenuItem "Friends" (constDyn $ text "Friends") def
-      $ (MenuSub (def & customMenu ?~ "right")
-          ( MenuWidget (uiTextInput def def) (def & link .~ NoLink)
-          $ MenuItem "Logout" (constDyn $ text "Logout") def
-          $ MenuBase )
-        )
+      ( MenuItem "Home" "Home" def
+      $ MenuItem "Messages" "Messages" def
+      $ MenuItem "Friends" "Friends" def
+      $ RightMenu
+        ( MenuWidget (uiTextInput def def) (def & link .~ NoLink)
+        $ MenuItem "Logout" "Logout" def
+        $ MenuBase )
       $ MenuBase
       ) $ pure "Home"
         & customMenu ?~ "secondary" & setValue .~ ("Home" <$ resetEvent)
@@ -460,13 +472,13 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
   exampleCardDyn id "Secondary Menu" "A menu can adjust its appearance to de-emphasize its contents" [mkExample|
   \resetEvent -> do
     (selected, search `HCons` _) <- ui $ Menu
-      ( MenuItem "Home" (constDyn $ text "Home") def
-      $ MenuItem "Messages" (constDyn $ text "Messages") def
-      $ MenuItem "Friends" (constDyn $ text "Friends") def
-      $ (MenuSub (def & customMenu ?~ "right")
-          $ MenuWidget (divClass "item" $ uiTextInput def def) def
-          . MenuItem "Logout" (constDyn $ text "Logout") def
-          $ MenuBase)
+      ( MenuItem "Home" "Home" def
+      $ MenuItem "Messages" "Messages" def
+      $ MenuItem "Friends" "Friends" def
+      $ RightMenu
+        ( MenuWidget (divClass "item" $ uiTextInput def def) def
+        $ MenuItem "Logout" "Logout" def
+        $ MenuBase)
       $ MenuBase
       ) $ def & customMenu ?~ "secondary" & setValue .~ (Nothing <$ resetEvent)
     return $ (,) <$> (selected :: Dynamic t (Maybe Text)) <*> _textInput_value search
@@ -474,24 +486,47 @@ menu = LinkedSection "Menu" "A menu displays grouped navigation actions" $ do
 
   exampleCardDyn id "Vertical Menu" "A vertical menu displays elements vertically" [mkExample|
   \resetEvent -> do
-    inboxCount <- count <=< uiButton def $ text "Add inbox item"
-    spamCount <- count <=< uiButton def $ text "Add spam item"
-    updatesCount <- count <=< uiButton def $ text "Add updates item"
-    let renderItem label classes (count :: Int) = do
-          text label
-          divClass (T.unwords $ "ui" : "label" : classes) $ text $ T.pack $ show count
-    fmap fst $ ui $ Menu
-      ( MenuItem ("Inbox" :: Text)
-          (renderItem "Inbox" ["teal left pointing"] <$> inboxCount)
-          (def & color ?~ Teal)
-      $ MenuItem "Spam" (renderItem "Spam" [] <$> spamCount) def
-      $ MenuItem "Updates" (renderItem "Updates" [] <$> updatesCount) def
-      $ MenuWidget (uiTextInput (custom "transparent icon" <$> def) def { _textInputConfig_attributes = constDyn $ "placeholder" =: "Search mail..." }) def
+    let counter txt = let widget = count <=< uiButton def $ text txt :: m (Dynamic t Int)
+                      in join <$> widgetHold widget (widget <$ resetEvent)
+    inboxCount <- counter "Add inbox item"
+    spamCount <- counter "Add spam item"
+    updatesCount <- counter "Add updates item"
+    let mkLabel dNum conf = Label (T.pack . show <$> dNum) $ def
+          & leftIcon .~ RenderWhen ((>=5) <$> dNum) (Icon "mail" def)
+          & hidden .~ fmap (<= 0) dNum
+          & conf
+          & color %~ zipDynWith (\a b -> if a >= 10 then Just Red else b) dNum
+    (selected, search `HCons` HNil) <- ui $ Menu
+      ( MenuItem ("inbox" :: Text) "Inbox"
+          (def & color ?~ Teal
+               & label ?~ mkLabel inboxCount
+                  (\x -> x & color .~ pure (Just Teal) & pointing .~ pure (Just LeftPointing)))
+      $ MenuItem "spam" "Spam" (def & label ?~ mkLabel spamCount id)
+      $ MenuItem "updates" "Updates"
+          (def & label ?~ mkLabel updatesCount (\x -> x & basic .~ pure True & color .~ pure (Just Black) & leftIcon .~ alwaysRender (Icon "announcement" def)))
+      $ MenuWidget (fst <$> uiTextInput' (custom "transparent icon" <$> def) def { _textInputConfig_attributes = constDyn $ "placeholder" =: "Search mail..." } (ui $ Icon "search" def)) def
       $ MenuBase
       ) $ def & setValue .~ (Just "Inbox" <$ resetEvent)
               & initialValue ?~ "Inbox"
               & vertical .~ True
+    return $ (,) <$> selected <*> _textInput_value search
   |]
+
+  rec
+    (eLabel, LabelResult {..}) <- ui' $ Label "test" $ def
+      & leftIcon .~ RenderWhen ((>3) <$> labelClicked) (Icon "user" $ def & size |?~ Huge)
+      & link .~ True
+    labelClicked <- count $ domEvent Click eLabel
+    iconClicked <- count . switch . current $ fmap (maybe never $ domEvent Click . fst) _leftIcon
+
+  el "p" $ do
+    text "The label has been clicked: "
+    display labelClicked
+    text " times."
+  el "p" $ do
+    text "The icon has been clicked: "
+    display iconClicked
+    text " times."
 
   return ()
 
@@ -528,6 +563,64 @@ radioGroups = LinkedSection "Radio Group" "" $ do
 
   return ()
 
+labels :: forall t m. MonadWidget t m => Section m
+labels = LinkedSection "Label" "" $ do
+
+  $(printDefinition stripParens ''Label)
+  $(printDefinition stripParens ''LabelConfig)
+
+  ui $ Header H3 (text "Types") def
+
+  divClass "ui equal width stackable grid" $ do
+
+    divClass "row" $ do
+      divClass "column" $ do
+        exampleCard "Label" "" [mkExample|
+        ui $ Label "Veronika" $ def
+          & image .~ alwaysRender (Image "https://semantic-ui.com/images/avatar/small/veronika.jpg" def)
+          & detail |?~ "Friend"
+          & color |?~ Blue
+        ui $ Label "Jenny" $ def
+          & image .~ alwaysRender (Image "https://semantic-ui.com/images/avatar/small/jenny.jpg" def)
+          & detail |?~ "Student"
+          & color |?~ Teal
+        ui $ Label "Christian" $ def
+          & image .~ alwaysRender (Image "https://semantic-ui.com/images/avatar/small/christian.jpg" def)
+          & detail |?~ "Co-worker"
+          & color |?~ Yellow
+        |]
+
+    divClass "row" $ do
+      divClass "column" $ do
+        exampleCardReset "Label" "" [mkExample|
+        \resetEvent -> do
+          let src person = "https://semantic-ui.com/images/avatar/small/" <> person <> ".jpg"
+              mkLabel (person, url, colour) = do
+                LabelResult _ iconResult _ <- ui $ Label (pure person) $ def
+                  & image .~ alwaysRender (Image (pure $ src url) def)
+                  & rightIcon .~ alwaysRender (Icon "delete" def)
+                  & color |?~ colour
+                return $ switch . current $ fmap (maybe never (domEvent Click . fst)) iconResult
+          mapM_ (removableWidget resetEvent . mkLabel)
+            [ ("Justen", "justen", Grey)
+            , ("Adrienne", "ade", Blue)
+            , ("Zoe", "zoe", Teal)
+            , ("Elliot", "elliot", Olive)
+            , ("Joe", "joe", Yellow)
+            , ("Matt", "matt", Orange)
+            ]
+        |]
+
+  return ()
+
+removableWidget :: MonadWidget t m => Event t () -> m (Event t ()) -> m ()
+removableWidget restore widget = do
+  rec res <- widgetHold widget $ leftmost
+        [ never <$ blank <$ switch (current res)
+        , widget <$ restore
+        ]
+  return ()
+
 icons :: MonadWidget t m => Section m
 icons = LinkedSection "Icon" "" $ do
 
@@ -543,17 +636,17 @@ icons = LinkedSection "Icon" "" $ do
       divClass "column" $ do
         exampleCard "Icons" "Several icons can be used together as a group" [mkExample|
         ui $ Icons
-          [ Icon "circle" $ def & size ?~ Big & color ?~ Blue
-          , Icon "car" $ def & inverted .~ True
+          [ Icon "circle" $ def & size |?~ Big & color |?~ Blue
+          , Icon "car" $ def & inverted |~ True
           ] $ def & size ?~ Huge
         ui $ Icons
-          [ Icon "thin circle" $ def & size ?~ Big
+          [ Icon "thin circle" $ def & size |?~ Big
           , Icon "user" def
           ] $ def & size ?~ Huge
         ui $ Icons
           [ Icon "certificate" $ def
-              & size ?~ Big & loading .~ True
-              & color ?~ Grey & inverted .~ True
+              & size |?~ Big & loading |~ True
+              & color |?~ Grey & inverted |~ True
           , Icon "cloud download" def
           ] $ def & size ?~ Huge
         |]
@@ -564,45 +657,82 @@ icons = LinkedSection "Icon" "" $ do
         ui $ Header H2 (text "Add on Twitter") $ def
           & icon ?~ Icons
               [ Icon "twitter" def
-              , Icon "corner add" $ def & inverted .~ True
+              , Icon "corner add" $ def & inverted |~ True
               ] (def & size ?~ Large)
         |]
 
+orElse :: a -> a -> Bool -> a
+orElse a _ True = a
+orElse _ b False = b
+
 exampleCard :: forall t m a. MonadWidget t m => Text -> Text -> (String, m a) -> m a
-exampleCard headerText subtitle (code, widget) = divClass "ui fluid card" $ do
-  isOpen <- divClass "content" $ do
-    let iconConf = def & link .~ True & floated ?~ RightFloated
-    isOpen <- (=<<) (toggle False) $ ui $ Icon "code" $ iconConf & title ?~ "Show Code"
-    divClass "header" (text headerText)
-    when (subtitle /= "") $ divClass "meta" (text subtitle)
-    return isOpen
-  widgetResult <- divClass "content" widget
-  void $ dyn $ codeEl <$> isOpen
+exampleCard headerText subText (code, widget) = divClass "ui segments" $ do
+  -- Title segment
+  divClass "ui segment" $ ui $ Header H4 (text headerText) $ def
+      & subHeader .~ if subText == "" then Nothing else Just $ text subText
+  -- Main segment
+  widgetResult <- divClass "ui segment" widget
+  -- Control buttons
+--  let classes open = def { _uiButton_custom = Just ("basic tiny compact"
+--      <> if open then " attached" else " bottom attached") }
+  let attrs open = "class" =: ("ui basic tiny compact buttons"
+          <> if open then " attached" else " bottom attached")
+  rec codeIsOpen <- toggle False <=< elDynAttr "div" (attrs <$> codeIsOpen) $ uiButton def
+          $ ui (Icon "code" def) >> dynText ("Hide Code" `orElse` "Show Code" <$> codeIsOpen)
+  void $ dyn $ codeEl <$> codeIsOpen
   return widgetResult
   where
     codeEl False = blank
-    codeEl True = divClass "content" $ hscode code
+    codeEl True = divClass "ui segment" $ hscode code
+
+exampleCardReset :: forall t m a. MonadWidget t m => Text -> Text -> (String, Event t () -> m a) -> m a
+exampleCardReset headerText subText (code, widget) = divClass "ui segments" $ do
+  -- Title segment
+  divClass "ui segment" $ ui $ Header H4 (text headerText) $ def
+      & subHeader .~ if subText == "" then Nothing else Just $ text subText
+  rec
+    -- Main segment
+    widgetResult <- divClass "ui segment" $ widget resetEvent
+    -- Control buttons
+    let attrs open = "class" =: ("ui basic tiny compact buttons"
+            <> if open then " attached" else " bottom attached")
+    (resetEvent, codeIsOpen) <- elDynAttr "div" (attrs <$> codeIsOpen) $ do
+      r <- uiButton def $ ui (Icon "refresh" def) >> text "Reset"
+      rec c <- toggle False <=< uiButton def
+            $ ui (Icon "code" def) >> dynText ("Hide Code" `orElse` "Show Code" <$> c)
+      return (r, c)
+  void $ dyn $ codeEl <$> codeIsOpen
+  return widgetResult
+  where
+    codeEl False = blank
+    codeEl True = divClass "ui segment" $ hscode code
 
 exampleCardDyn :: forall t m a b. (Show a, MonadWidget t m)
                => (b -> Dynamic t a) -> Text -> Text
                -> (String, Event t () -> m b) -> m (Dynamic t a)
-exampleCardDyn getDyn headerText subtitle (code, widget) = divClass "ui fluid card" $ do
-  (isOpen, resetEvent) <- divClass "content" $ do
-    let iconConf = def & link .~ True & floated ?~ RightFloated
-    isOpen <- (=<<) (toggle False) $ ui $ Icon "code" $ iconConf & title ?~ "Show Code"
-    resetEvent <- ui $ Icon "refresh" $ iconConf & title ?~ "Reset"
-    divClass "header" (text headerText)
-    when (subtitle /= "") $ divClass "meta" (text subtitle)
-    return (isOpen, resetEvent)
-  widgetResult <- getDyn <$> divClass "content" (widget resetEvent)
-  divClass "extra content" $ do
+exampleCardDyn getDyn headerText subText (code, widget) = divClass "ui segments" $ do
+  -- Title segment
+  divClass "ui segment" $ ui $ Header H4 (text headerText) $ def
+      & subHeader .~ if subText == "" then Nothing else Just $ text subText
+  rec
+    -- Main segment
+    widgetResult <- fmap getDyn $ divClass "ui segment" $ widget resetEvent
+    -- Control buttons
+    let attrs open = "class" =: ("ui basic tiny compact buttons"
+            <> if open then " attached" else " bottom attached")
+    (resetEvent, codeIsOpen) <- elDynAttr "div" (attrs <$> codeIsOpen) $ do
+      r <- uiButton def $ ui (Icon "refresh" def) >> text "Reset"
+      rec c <- toggle False <=< uiButton def
+            $ ui (Icon "code" def) >> dynText ("Hide Code" `orElse` "Show Code" <$> c)
+      return (r, c)
+  divClass "ui segment" $ do
     ui $ Header H4 (text "Value") $ def & header .~ ContentHeader
     dyn $ hscode . show <$> widgetResult
-  void $ dyn $ codeEl <$> isOpen
+  void $ dyn $ codeEl <$> codeIsOpen
   return widgetResult
   where
     codeEl False = blank
-    codeEl True = divClass "content" $ hscode code
+    codeEl True = divClass "ui segment" $ hscode code
 
 scrollIntoView :: Text -> JSM ()
 scrollIntoView id = do
@@ -638,7 +768,7 @@ putSections sections = do
   elAttr "div" ("id" =: "main" <> "class" =: "ui container") $ do
     -- Menu
     (stickyEl, _) <- divClass "ui dividing right rail" $ do
-      elAttr' "div" ("class" =: "ui sticky") $ do -- TODO make sticky work
+      elAttr' "div" ("class" =: "ui sticky") $ do
 
         ui $ Header H4 (text "Components") def
         --divClass "ui vertical following fluid accordion text menu" $ do
@@ -678,34 +808,95 @@ putSections sections = do
           & subHeader .~ if subHeading == "" then Nothing else Just (text subHeading)
         child
 
+{-
     performEvent_ $ (void . liftJSM $ do
       o <- obj
       o <# ("offset" :: Text) $ (30 :: Int)
       o <# ("context" :: Text) $ _element_raw contextEl
       o <# ("observeChanges" :: Text) $ True
       jQuery (_element_raw stickyEl) ^. js1 ("sticky" :: Text) o) <$ pb
+-}
+    return ()
 
   where
     toId = T.intercalate "-" . T.words . T.toLower
     renderItems [] = MenuBase
     renderItems (LinkedSection heading _ _:rest)
-      = MenuItem (toId heading) (constDyn $ text heading) def $ renderItems rest
+      = MenuItem (toId heading) heading def $ renderItems rest
 
 example :: JSM ()
-example = semanticMain $ do
+example = mainWidget $ do
+
+{-
+  counter <- count <=< uiButton def $ text "Switch"
+  display counter
+
+  flip <- toggle False <=< uiButton def $ text "Flip dyns"
+  let flagType = "dk flag" `orElse` "fi flag" <$> flip
+
+  let static = divClass "" $ do
+        el "h1" $ text "Static"
+        liftJSM $ consoleTime "static"
+        replicateM_ 3000 $ elClass "i" "gb flag" blank
+        liftJSM $ consoleTimeEnd "static"
+      pureDynamic = divClass "" $ do
+        el "h1" $ text "Pure Dynamic"
+        liftJSM $ consoleTime "pureDynamic"
+        replicateM_ 3000 $ elDynAttr "i" (pure $ "class" =: "gb flag") blank
+        liftJSM $ consoleTimeEnd "pureDynamic"
+      pureDynamicList = divClass "" $ do
+        el "h1" $ text "Pure Dynamic List"
+        liftJSM $ consoleTime "pureDynamicList"
+        simpleList (pure $ [1..3000]) $ \_ -> elClass "i" "gb flag" blank
+        liftJSM $ consoleTimeEnd "pureDynamicList"
+      dynamic = divClass "" $ do
+        el "h1" $ text "Dynamic"
+        liftJSM $ consoleTime "dynamic"
+        replicateM_ 3000 $ elDynAttr "i" (("class" =:) <$> flagType) blank
+        liftJSM $ consoleTimeEnd "dynamic"
+      libraryStatic = divClass "" $ do
+        el "h1" $ text "Library Static"
+        liftJSM $ consoleTime "libraryStatic"
+        replicateM_ 3000 $ ui $ Flag "gb flag"
+        liftJSM $ consoleTimeEnd "libraryStatic"
+      libraryPureDynamic = divClass "" $ do
+        el "h1" $ text "Library Pure Dynamic"
+        liftJSM $ consoleTime "libraryPureDynamic"
+        replicateM_ 3000 $ ui $ Flag $ Dynamic "gb flag"
+        liftJSM $ consoleTimeEnd "libraryPureDynamic"
+      libraryDynamic = divClass "" $ do
+        el "h1" $ text "Library Dynamic"
+        liftJSM $ consoleTime "libraryDynamic"
+        replicateM_ 3000 $ ui $ Flag $ Dynamic flagType
+        liftJSM $ consoleTimeEnd "libraryDynamic"
+
+  widgetHold blank $ leftmost
+    [ static <$ ffilter (\x -> x `mod` 12 == 0) (updated counter)
+    , pureDynamic <$ ffilter (\x -> x `mod` 12 == 2) (updated counter)
+    , pureDynamicList <$ ffilter (\x -> x `mod` 12 == 3) (updated counter)
+    , dynamic <$ ffilter (\x -> x `mod` 12 == 4) (updated counter)
+    , libraryStatic <$ ffilter (\x -> x `mod` 12 == 6) (updated counter)
+    , libraryPureDynamic <$ ffilter (\x -> x `mod` 12 == 8) (updated counter)
+    , libraryDynamic <$ ffilter (\x -> x `mod` 12 == 10) (updated counter)
+    , blank <$ updated counter
+    ]
+  return ()
+-}
+
   elAttr "div" ("id" =: "masthead" <> "class" =: "ui vertical segment") $ do
     divClass "ui container" $ do
       let semanticLogo = Image "https://semantic-ui.com/images/logo.png" $ def
-            & size ?~ Massive & rounded ?~ Rounded
+            & size |?~ Massive & rounded |?~ Rounded
       ui $ Header H1 (text "Semantic UI for Reflex Dom") $ def
         & image ?~ semanticLogo
         & subHeader ?~ text "Documentation and examples"
-      elAttr "a" ("class" =: "ui button" <> "href" =: "") $ text "Hackage"
-      elAttr "a" ("class" =: "ui blue button"
+      elAttr "a" ("class" =: "ui disabled button" <> "href" =: "") $ text "Hackage"
+      elAttr "a" ("class" =: "ui teal button"
                <> "href" =: "https://github.com/tomsmalley/reflex-dom-semui") $ do
         ui $ Icon "github" $ def
         text "GitHub"
       return ()
 
-  putSections [ menu, checkboxes, dropdowns, radioGroups, icons ]
+  putSections [ menu, checkboxes, dropdowns, radioGroups, labels, icons, flags ]
+--  putSections [ labels ]
 

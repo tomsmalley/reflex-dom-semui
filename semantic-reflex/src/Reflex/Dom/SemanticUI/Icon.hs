@@ -16,6 +16,7 @@
 
 module Reflex.Dom.SemanticUI.Icon where
 
+import Data.Foldable (traverse_)
 import           Data.Default
 import           Data.Semigroup ((<>))
 import           Data.Text (Text)
@@ -25,104 +26,67 @@ import Data.Maybe (catMaybes)
 
 import           Reflex.Dom.SemanticUI.Common
 
-data HorizontalAttached = LeftAttached | RightAttached deriving (Eq, Show)
-data VerticalAttached = TopAttached | BottomAttached deriving (Eq, Show)
+--data Flag t = Flag (Dynamic t Text)
+data Flag t = Flag (Active t Text)
 
-instance UiClassText VerticalAttached where
-  uiText TopAttached = "top"
-  uiText BottomAttached = "bottom"
+instance t ~ t' => UI t' m (Flag t) where
+  type Return t' m (Flag t) = ()
+  --ui' (Flag flagDyn) = elDynAttr' "i" (attr <$> flagDyn) blank
+  ui' (Flag flagActive) = case flagActive of
+    Static flag -> elAttr' "i" (attr flag) blank
+    Dynamic flagDyn -> elDynAttr' "i" (attr <$> flagDyn) blank
+    where
+      attr flag = "class" =: (flag <> " flag")
 
-instance UiClassText HorizontalAttached where
-  uiText LeftAttached = "left"
-  uiText RightAttached = "right"
+data Icon t
+  = Icon (Dynamic t Text) (IconConfig t)
+  | Icons [Icon t] IconsConfig
 
-combineAttached :: Maybe VerticalAttached -> Maybe HorizontalAttached -> Maybe Text
-combineAttached Nothing Nothing = Nothing
-combineAttached mv mh = Just $ T.unwords $ catMaybes [ uiText <$> mv, uiText <$> mh, Just "attached" ]
-
-data Label = Label Text LabelConfig
-data LabelConfig = LabelConfig
-  { _vAttached :: Maybe VerticalAttached
-  , _hAttached :: Maybe HorizontalAttached
-  , _link :: Bool
-  }
-
-instance Default LabelConfig where
-  def = LabelConfig
-    { _vAttached = Nothing
-    , _hAttached = Nothing
-    , _link = False
-    }
-
-labelConfigClasses :: LabelConfig -> [Text]
-labelConfigClasses LabelConfig {..} = catMaybes
-  [ combineAttached _vAttached _hAttached
-  ]
-
-instance UI t m Label where
-  type Return t m Label = Event t ()
-
-  ui' (Label txt config@LabelConfig {..}) = do
-    (e, _) <- elAttr' elType ("class" =: T.unwords classes) $ text txt
-    return $ (e, domEvent Click e)
-      where
-        classes = "ui" : "label" : labelConfigClasses config
-        elType = if _link then "a" else "div"
-
-data Flag = Flag Text
-
-instance UI t m Flag where
-  type Return t m Flag = ()
-  ui' (Flag flag) = elAttr' "i" ("class" =: (flag <> " flag")) blank
-
-data Icon
-  = Icon Text IconConfig
-  | Icons [Icon] IconsConfig
-
-data IconConfig = IconConfig
-  { _disabled :: Bool
-  , _loading :: Bool
-  , _fitted :: Bool
-  , _size :: Maybe Size
-  , _link :: Bool
-  , _floated :: Maybe Floated
-  , _title :: Maybe Text
+data IconConfig t = IconConfig
+  { _disabled :: Dynamic t Bool
+  , _loading :: Dynamic t Bool
+  , _fitted :: Dynamic t Bool
+  , _size :: Dynamic t (Maybe Size)
+  , _link :: Dynamic t Bool
+  , _floated :: Dynamic t (Maybe Floated)
+  , _title :: Dynamic t (Maybe Text)
 --  , _flipped :: Bool
 --  , _rotated :: Bool
 --  , _circular :: Bool
 --  , _bordered :: Bool
-  , _inverted :: Bool
-  , _color :: Maybe Color
+  , _inverted :: Dynamic t Bool
+  , _color :: Dynamic t (Maybe Color)
   }
 
-instance Default IconConfig where
+instance Reflex t => Default (IconConfig t) where
   def = IconConfig
-    { _disabled = False
-    , _loading = False
-    , _fitted = False
-    , _size = Nothing
-    , _link = False
-    , _floated = Nothing
-    , _title = Nothing
-    , _inverted = False
-    , _color = Nothing
+    { _disabled = pure False
+    , _loading = pure False
+    , _fitted = pure False
+    , _size = pure Nothing
+    , _link = pure False
+    , _floated = pure Nothing
+    , _title = pure Nothing
+    , _inverted = pure False
+    , _color = pure Nothing
     }
 
-iconConfigClasses :: IconConfig -> [Text]
-iconConfigClasses IconConfig {..} = catMaybes
-  [ justWhen _disabled "disabled"
-  , justWhen _loading "loading"
-  , justWhen _fitted "fitted"
-  , justWhen _link "link"
-  , justWhen _inverted "inverted"
-  , uiText <$> nothingIf Medium _size
-  , uiText <$> _floated
-  , uiText <$> _color
+iconConfigClasses :: Reflex t => IconConfig t -> Dynamic t ClassText
+iconConfigClasses IconConfig {..} = mconcat
+  [ memptyUnless "disabled" <$> _disabled
+  , memptyUnless "loading" <$> _loading
+  , memptyUnless "fitted" <$> _fitted
+  , memptyUnless "link" <$> _link
+  , memptyUnless "inverted" <$> _inverted
+  , toClassText . nothingIf Medium <$> _size
+  , toClassText <$> _floated
+  , toClassText <$> _color
   ]
 
 data IconsConfig = IconsConfig
   { _size :: Maybe Size
   }
+  deriving (Eq, Show)
 
 instance Default IconsConfig where
   def = IconsConfig
@@ -135,19 +99,17 @@ instance Default IconsConfig where
 --    = elAttr "i" ("class" =: T.unwords classes) $ mapM_ ui icons
 --      where classes = "icons" : maybe [] (pure . uiTextSize) _size
 
-instance UI t m Icon where
-  type Return t m Icon = Event t ()
+instance t' ~ t => UI t' m (Icon t) where
+  type Return t' m (Icon t) = ()
 
-  ui' (Icon icon config@IconConfig {..}) = do
-    (e, _) <- elAttr' "i" ("class" =: T.unwords classes <> mtitle) blank
-    return (e, domEvent Click e)
-      where classes = icon : "icon" : iconConfigClasses config
-            mtitle
-              | Just title <- _title = "title" =: title
-              | otherwise = mempty
+  ui' (Icon dynIcon config@IconConfig {..}) = elDynAttr' "i" attrs blank
+    where
+      attrs = mkAttrs <$> dynIcon <*> iconConfigClasses config <*> _title
+      mkAttrs i c t = maybe mempty ("title" =:) t
+                   <> "class" =: getClass (mconcat [ClassText (Just i), "icon", c])
 
   ui' (Icons icons IconsConfig {..})
-    = elAttr' "i" ("class" =: T.unwords classes) $ leftmost <$> traverse ui icons
+    = elAttr' "i" ("class" =: T.unwords classes) $ traverse_ ui_ icons
       where classes = "icons" : maybe [] (pure . uiText) _size
 
 data UiIcon = UiIcon

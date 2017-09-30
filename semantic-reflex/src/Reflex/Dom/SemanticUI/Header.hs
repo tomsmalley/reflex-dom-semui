@@ -22,52 +22,12 @@ import           Reflex.Dom.Core hiding
   )
 
 import Reflex.Dom.SemanticUI.Icon
+import Reflex.Dom.SemanticUI.Image
 import Reflex.Dom.SemanticUI.Common
 
-data ImageConfig = ImageConfig
-  { _size :: Maybe Size
-  , _rounded :: Maybe ImageRounded
-  , _avatar :: Bool
-  , _floated :: Maybe Floated
-  }
-
-instance Default ImageConfig where
-  def = ImageConfig
-    { _size = Nothing
-    , _rounded = Nothing
-    , _avatar = False
-    , _floated = Nothing
-    }
-
-imageConfigClasses :: ImageConfig -> [Text]
-imageConfigClasses ImageConfig {..} = catMaybes
-  [ uiText <$> _size
-  , uiText <$> _rounded
-  , justWhen _avatar "avatar"
-  , uiText <$> _floated
-  ]
-
-data Image = Image
-  { _src :: Text
-  , _config :: ImageConfig
-  }
-
-data ImageRounded = Rounded | Circular deriving (Eq, Show)
-
-instance UiClassText ImageRounded where
-  uiText Rounded = "rounded"
-  uiText Circular = "circular"
-
-instance UI t m Image where
-  type Return t m Image = ()
-  ui' (Image src config@ImageConfig {..}) = elAttr' "img" attrs blank
-    where
-      attrs = "src" =: src <> "class" =: T.unwords classes
-      classes = "ui" : "image" : imageConfigClasses config
-
-data HeaderConfig m = HeaderConfig
-  { _image :: Maybe Image
-  , _icon :: Maybe Icon
+data HeaderConfig t m = HeaderConfig
+  { _image :: Maybe (Image t)
+  , _icon :: Maybe (Icon t)
   , _subHeader :: Maybe (m ())
   , _header :: HeaderType
   , _dividing :: Bool
@@ -77,7 +37,7 @@ data HeaderConfig m = HeaderConfig
   , _attributes :: Map Text Text
   }
 
-instance Default (HeaderConfig m) where
+instance Default (HeaderConfig t m) where
   def = HeaderConfig
     { _image = Nothing
     , _icon = Nothing
@@ -90,7 +50,7 @@ instance Default (HeaderConfig m) where
     , _attributes = mempty
     }
 
-headerConfigClasses :: HeaderConfig m -> [Text]
+headerConfigClasses :: HeaderConfig t m -> [Text]
 headerConfigClasses HeaderConfig {..} = catMaybes
   [ justWhen _dividing "dividing"
   , justWhen _item "item"
@@ -130,17 +90,17 @@ instance UI t m Paragraph where
 -- | Create a header.
 --
 -- https://semantic-ui.com/elements/header.html
-data Header m a = Header
+data Header t m a = Header
   { _size :: HeaderSize
   , _content :: m a
-  , _config :: HeaderConfig m
+  , _config :: HeaderConfig t m
   }
 
-instance ToItem (Header m a) where
+instance ToItem (Header t m a) where
   toItem (Header size content config) = Header size content $
     config { _item = True, _component = False }
 
-instance ToPart (Header m a) where
+instance ToPart (Header t m a) where
   toPart (Header size content config) = Header size content $
     config { _component = False }
 
@@ -152,8 +112,8 @@ instance m ~ m' => UI t m' (Anchor m a) where
     (a, b) <- elAttr' "a" ("href" =: href <> "class" =: "ui anchor") inner
     return (a, (domEvent Click a, b))
 
-instance m ~ m' => UI t m' (Header m a) where
-  type Return t m' (Header m a) = a
+instance (t ~ t', m ~ m') => UI t' m' (Header t m a) where
+  type Return t' m' (Header t m a) = a
   ui' (Header size widget config@HeaderConfig {..}) = case _header of
     PageHeader -> elAttr' (headerSizeEl size) attrs iContent
       where attrs = "class" =: T.unwords classes <> _attributes

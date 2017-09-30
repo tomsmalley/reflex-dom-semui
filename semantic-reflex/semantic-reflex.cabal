@@ -37,7 +37,9 @@ library
     Reflex.Dom.SemanticUI.Dropdown
     Reflex.Dom.SemanticUI.Header
     Reflex.Dom.SemanticUI.Icon
+    Reflex.Dom.SemanticUI.Image
     Reflex.Dom.SemanticUI.Input
+    Reflex.Dom.SemanticUI.Label
     Reflex.Dom.SemanticUI.Lenses
     Reflex.Dom.SemanticUI.Menu
     Reflex.Dom.SemanticUI.Modal

@@ -12,12 +12,18 @@
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE TypeFamilyDependencies   #-}
 {-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving     #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveAnyClass     #-}
 
 module Reflex.Dom.SemanticUI.Common where
 
 ------------------------------------------------------------------------------
-import           Control.Lens ((^.))
+import           Control.Lens ((^.), set, ASetter)
 import           Control.Monad (void)
+import Data.Default
+import Data.String
+import Data.Semigroup
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Language.Javascript.JSaddle
@@ -32,6 +38,16 @@ consoleLog :: ToJSVal a => a -> JSM ()
 consoleLog a = do
   console <- jsg ("console" :: Text)
   void $ console ^. js1 ("log" :: Text) a
+
+consoleTime :: JSString -> JSM ()
+consoleTime a = do
+  console <- jsg ("console" :: Text)
+  void $ console ^. js1 ("time" :: Text) a
+
+consoleTimeEnd :: JSString -> JSM ()
+consoleTimeEnd a = do
+  console <- jsg ("console" :: Text)
+  void $ console ^. js1 ("timeEnd" :: Text) a
 
 -- | Catch any JSExceptions and log them to the console. Useful for debugging
 -- ghc implementations, especially wth jsaddle-warp.
@@ -63,6 +79,34 @@ imap f = go 0
 
 ------------------------------------------------------------------------------
 
+newtype ClassText = ClassText (Maybe Text) deriving (Eq, Show)
+
+getClass :: ClassText -> Text
+getClass (ClassText (Just a)) = a
+getClass (ClassText Nothing) = ""
+
+instance IsString ClassText where
+  fromString str = ClassText $ Just $ fromString str
+
+instance Monoid ClassText where
+  mappend = (<>)
+  mempty = ClassText Nothing
+
+instance Semigroup ClassText where
+  ClassText (Just a) <> ClassText (Just b) = ClassText $ Just $ a <> " " <> b
+  ClassText ma <> ClassText mb = ClassText $ ma <> mb
+
+memptyUnless :: Monoid m => m -> Bool -> m
+memptyUnless _ False = mempty
+memptyUnless m True = m
+
+class ToClassText a where
+  toClassText :: a -> ClassText
+
+instance ToClassText a => ToClassText (Maybe a) where
+  toClassText Nothing = mempty
+  toClassText (Just a) = toClassText a
+
 nothingIf :: Eq a => a -> Maybe a -> Maybe a
 nothingIf x (Just y) | x == y = Nothing
 nothingIf _ m = m
@@ -71,9 +115,35 @@ justWhen :: Bool -> a -> Maybe a
 justWhen True = Just
 justWhen False = const Nothing
 
+data Active t a
+  = Dynamic !(Dynamic t a)
+  | Static !a
+
+instance Reflex t => Functor (Active t) where
+  fmap f (Static a) = Static (f a)
+  fmap f (Dynamic a) = Dynamic (fmap f a)
+
+instance Reflex t => Applicative (Active t) where
+  pure a = Static a
+  Static f <*> Static a = Static (f a)
+  Dynamic f <*> Dynamic a = Dynamic (f <*> a)
+  Static f <*> Dynamic a = Dynamic (f <$> a)
+  Dynamic f <*> Static a = Dynamic (($ a) <$> f)
+
+instance IsString a => IsString (Active t a) where
+  fromString = Static . fromString
+
+instance Reflex t => IsString (Dynamic t Text) where
+  fromString = pure . fromString
+
+runActive :: (MonadWidget t m, UI t m a) => Active t a -> m ()
+runActive (Dynamic a) = void $ dyn $ ui_ <$> a
+runActive (Static a) = ui_ a
+
 class UI t m a where
   type Return t m a
   ui' :: MonadWidget t m => a -> m (El t, Return t m a)
+--  uiDyn :: MonadWidget t m => Dynamic t a -> m (El t, Return t m a)
 
 ui :: (MonadWidget t m, UI t m a) => a -> m (Return t m a)
 ui = fmap snd . ui'
@@ -84,12 +154,15 @@ ui_ = void . ui
 part_ :: (MonadWidget t m, Part t m a) => a -> m ()
 part_ = void . part
 
+part :: (MonadWidget t m, Part t m a) => a -> m (Return t m a)
+part = fmap snd . part'
+
 class ToItem a where
   toItem :: a -> a
 
 class (ToPart a, UI t m a) => Part t m a where
-  part :: MonadWidget t m => a -> m (Return t m a)
-  part = ui . toPart
+  part' :: MonadWidget t m => a -> m (El t, Return t m a)
+  part' = ui' . toPart
 
 instance (ToPart a, UI t m a) => Part t m a where
 
@@ -100,7 +173,66 @@ instance UI t m Text where
 class ToPart a where
   toPart :: a -> a
 
+---------
+
+data RenderWhen t a = NeverRender | RenderWhen { _when :: Dynamic t Bool, _render :: a }
+
+instance Reflex t => Default (RenderWhen t a) where
+  def = NeverRender
+
+alwaysRender :: Reflex t => a -> RenderWhen t a
+alwaysRender a = RenderWhen
+  { _when = pure True
+  , _render = a
+  }
+
+runRenderWhen
+  :: forall t m a. (UI t m a, UI t m a, MonadWidget t m)
+  => (a -> m (El t, Return t m a))
+  -> RenderWhen t a
+  -> m (Dynamic t (Maybe (El t, Return t m a)))
+runRenderWhen _ NeverRender = return $ pure Nothing
+runRenderWhen render RenderWhen {..} = do
+  trimmed :: Dynamic t Bool <- holdUniqDyn _when
+
+  res <- dyn $ fmap (sequence . f) trimmed
+  holdDyn Nothing res
+
+  where
+    f :: Bool -> Maybe (m (El t, Return t m a))
+    f False = Nothing
+    f True = Just $ render _render
+
+
+renderRenderWhen
+  :: forall t m a. (UI t m a, MonadWidget t m)
+  => RenderWhen t a
+  -> m (Dynamic t (Maybe (El t, Return t m a)))
+renderRenderWhen NeverRender = return $ pure Nothing
+renderRenderWhen RenderWhen {..} = do
+  trimmed :: Dynamic t Bool <- holdUniqDyn _when
+
+  res <- dyn $ fmap (sequence . f) trimmed
+  holdDyn Nothing res
+
+  where
+    f :: Bool -> Maybe (m (El t, Return t m a))
+    f False = Nothing
+    f True = Just $ ui' _render
+
+---------
+
+(|~) :: Reflex t' => ASetter s t a (Dynamic t' b) -> b -> s -> t
+l |~ b = set l (pure b)
+
+(|?~) :: Reflex t' => ASetter s t a (Dynamic t' (Maybe b)) -> b -> s -> t
+l |?~ b = set l (pure $ Just b)
+
 data Floated = LeftFloated | RightFloated deriving (Eq, Show)
+
+instance ToClassText Floated where
+  toClassText LeftFloated = "left floated"
+  toClassText RightFloated = "right floated"
 
 instance UiClassText Floated where
   uiText LeftFloated = "left floated"
@@ -108,8 +240,41 @@ instance UiClassText Floated where
 
 data Size = Mini | Tiny | Small | Medium | Large | Big | Huge | Massive deriving (Eq, Show)
 
+instance ToClassText Size where
+  toClassText Mini = "mini"
+  toClassText Tiny = "tiny"
+  toClassText Small = "small"
+  toClassText Medium = "medium"
+  toClassText Large = "large"
+  toClassText Big = "big"
+  toClassText Huge = "huge"
+  toClassText Massive = "massive"
+
 instance UiClassText Size where
   uiText = T.toLower . T.pack . show
+
+data HorizontalAttached = LeftAttached | RightAttached deriving (Eq, Show)
+data VerticalAttached = TopAttached | BottomAttached deriving (Eq, Show)
+
+instance UiClassText VerticalAttached where
+  uiText TopAttached = "top"
+  uiText BottomAttached = "bottom"
+
+instance UiClassText HorizontalAttached where
+  uiText LeftAttached = "left"
+  uiText RightAttached = "right"
+
+instance ToClassText VerticalAttached where
+  toClassText TopAttached = "top"
+  toClassText BottomAttached = "bottom"
+
+instance ToClassText HorizontalAttached where
+  toClassText LeftAttached = "left"
+  toClassText RightAttached = "right"
+
+combineAttached :: Maybe VerticalAttached -> Maybe HorizontalAttached -> ClassText
+combineAttached Nothing Nothing = mempty
+combineAttached mv mh = mconcat [ toClassText mv, toClassText mh, "attached" ]
 
 data Color
   = Red
@@ -126,6 +291,21 @@ data Color
   | Grey
   | Black
   deriving (Eq,Ord,Read,Show,Enum,Bounded)
+
+instance ToClassText Color where
+  toClassText Red = "red"
+  toClassText Orange = "orange"
+  toClassText Yellow = "yellow"
+  toClassText Olive = "olive"
+  toClassText Green = "green"
+  toClassText Teal = "teal"
+  toClassText Blue = "blue"
+  toClassText Violet = "violet"
+  toClassText Purple = "purple"
+  toClassText Pink = "pink"
+  toClassText Brown = "brown"
+  toClassText Grey = "grey"
+  toClassText Black = "black"
 
 instance UiClassText Color where
   uiText Red = "red"
@@ -242,16 +422,6 @@ primary = uiSetEmphasis UiPrimary
 secondary = uiSetEmphasis UiSecondary
 positive = uiSetEmphasis UiPositive
 negative = uiSetEmphasis UiNegative
-
-------------------------------------------------------------------------------
-data UiBasic = UiBasic
-  deriving (Eq,Ord,Read,Show,Enum,Bounded)
-
-instance UiClassText UiBasic where
-  uiText UiBasic = "basic"
-
-class UiHasBasic a where
-  basic :: a -> a
 
 ------------------------------------------------------------------------------
 data UiInverted = UiInverted

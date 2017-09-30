@@ -3,7 +3,7 @@
 , haskell-src-meta, hscolour, jsaddle, jsaddle-warp, lens, mtl
 , reflex, reflex-dom-core, semantic-reflex, stdenv, template-haskell, text, these
 , wai, wai-app-static, warp, websockets, ghcjs
-, closurecompiler
+, closurecompiler, runCC
 }:
 mkDerivation rec {
   pname = "example";
@@ -45,6 +45,7 @@ mkDerivation rec {
     mkdir $out/dist;
     mkdir $out/dist/js;
     cp -r ${semantic-reflex}/share/*/*/lib/dist/* $out/dist;
+  '' + (if runCC then (''
     echo Running closure compiler...;
   '' + builtins.replaceStrings ["\n"] [" "] ''
       closure-compiler
@@ -53,7 +54,9 @@ mkDerivation rec {
       --externs=${semantic-reflex}/share/*/*/lib/jquery.js.externs
       $out/bin/${pname}.jsexe/all.js
       -O ADVANCED;
-  '' + ''
+  '') else (''
+    cp $out/bin/${pname}.jsexe/all.js $out/dist/js/all.js
+  '')) + ''
   echo GHCJS build output in result/dist;
   '');
 }

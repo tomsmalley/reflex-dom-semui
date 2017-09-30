@@ -1,4 +1,4 @@
-{ reflex-platform ? ../reflex-platform/. , ghcjs ? false }:
+{ reflex-platform ? ../reflex-platform/. , ghcjs ? false, runCC ? true }:
 let
 
   dontCheckPackages = [
@@ -36,5 +36,5 @@ let
     in pkgs.lib.mapAttrs' toPackage (builtins.readDir ./nix);
 
 in if ghcjs
-    then (doOverrides platform.ghcjs).callPackage ./example { inherit ghcjs; }
-    else (doOverrides platform.ghc).callPackage ./example { inherit ghcjs; }
+    then (doOverrides platform.ghcjs).callPackage ./example { inherit ghcjs runCC; }
+    else (doOverrides platform.ghc).callPackage ./example { inherit ghcjs runCC; }

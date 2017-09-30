@@ -14,12 +14,12 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Reflex.Dom.SemanticUI.Menu where
 
 import Data.Kind (Type)
-import           Control.Monad (unless, void)
-import           Control.Lens ((^.))
+import           Control.Monad (void)
 import           Data.Default (Default (def))
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -28,12 +28,12 @@ import           Data.Semigroup ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import Data.These
-import           Language.Javascript.JSaddle (liftJSM, js0)
 import           Reflex
-import           Reflex.Dom.Core hiding (Dropdown(..), Link, value, Select)
+import           Reflex.Dom.Core hiding (Dropdown(..), DropdownConfig(..), Link, value, Select)
 import Data.Align
 
 import Reflex.Dom.SemanticUI.Icon
+import Reflex.Dom.SemanticUI.Label
 import Reflex.Dom.SemanticUI.Common
 import Reflex.Dom.SemanticUI.Dropdown
 
@@ -95,18 +95,24 @@ data Link
   | NoLink    -- ^ Not a link
   deriving (Eq, Show)
 
-data MenuItemConfig = MenuItemConfig
+data MenuItemConfig t m = MenuItemConfig
   { _color :: Maybe Color
   , _link :: Link
+  , _render :: Maybe (Dynamic t (m ())) -- Extra arbitrary content
+  , _icon :: Maybe (Icon t)
+  , _label :: Maybe (Label t)
   }
 
-instance Default MenuItemConfig where
+instance Default (MenuItemConfig t m) where
   def = MenuItemConfig
     { _color = Nothing
     , _link = NoLink
+    , _render = Nothing
+    , _icon = Nothing
+    , _label = Nothing
     }
 
-menuItemConfigClasses :: MenuItemConfig -> [Text]
+menuItemConfigClasses :: MenuItemConfig t m -> [Text]
 menuItemConfigClasses MenuItemConfig {..} = catMaybes
   [ uiText <$> _color
   , justWhen (_link == StyleLink) "link"
@@ -118,23 +124,14 @@ data MenuItems t m a (xs :: [Type]) where
   -- | Empty menu
   MenuBase :: MenuItems t m a '[]
   -- | Normal clickable menu item
-  MenuItem :: a -> Dynamic t (m ()) -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a xs
+  MenuItem :: a -> Text -> MenuItemConfig t m -> MenuItems t m a xs -> MenuItems t m a xs
+  -- | Sub widget, capturing the value
+  MenuWidget :: m b -> MenuItemConfig t m -> MenuItems t m a xs -> MenuItems t m a (b ': xs)
+  -- | Arbitrary widget, ignoring the value
+  MenuWidget_ :: m b -> MenuItemConfig t m -> MenuItems t m a xs -> MenuItems t m a xs
   -- | Sub menu
   SubMenu :: HListAppend ys xs => Dynamic t (m ()) -> MenuItems t m a ys -> MenuItems t m a xs -> MenuItems t m a (ys `Append` xs)
-  -- | Sub widget, capturing the value
-  UIContent :: (Return t m b ~ rb, Part t m b) => b -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a (rb ': xs)
-  -- | Sub widget, ignoring the value
-  UIContent_ :: Part t m b => b -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a xs
-  -- | Sub item widget, capturing the value
-  UIItemContent :: (Return t m b ~ rb, ToItem b, UI t m b) => b -> MenuItems t m a xs -> MenuItems t m a (rb ': xs)
-  -- | Sub item widget, ignoring the value
-  UIItemContent_ :: (ToItem b, UI t m b) => b -> MenuItems t m a xs -> MenuItems t m a xs
-  -- | Sub widget, capturing the value
-  MenuWidget :: m b -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a (b ': xs)
-  -- | Arbitrary widget, ignoring the value
-  MenuWidget_ :: m b -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a xs
-  -- | Sub menu
-  MenuSub :: HListAppend ys xs => MenuConfig t (Proxy a) -> MenuItems t m a ys -> MenuItems t m a xs -> MenuItems t m a (ys `Append` xs)
+  RightMenu :: HListAppend ys xs => MenuItems t m a ys -> MenuItems t m a xs -> MenuItems t m a (ys `Append` xs)
   -- | Dropdown menu
   DropdownMenu :: Text -> [DropdownItem t m a] -> MenuItems t m a xs -> MenuItems t m a xs
 
@@ -215,9 +212,8 @@ renderItems
 renderItems allItems currentValue = go False allItems
   where
     selected = demux currentValue
-    updatedValue = updated currentValue
 
-    itemElAttrs :: MenuItemConfig -> (Text, Map Text Text)
+    itemElAttrs :: MenuItemConfig t m -> (Text, Map Text Text)
     itemElAttrs conf@MenuItemConfig{..} = case _link of
       Link href -> ("a", "href" =: href <> "class" =: classes)
       _ -> ("div", "class" =: classes)
@@ -228,14 +224,13 @@ renderItems allItems currentValue = go False allItems
 
       MenuBase -> return ([], HNil)
 
-      -- TODO: Icons in config, Dynamic element into config, just allow text or
-      -- non dynamic rendering
-      MenuItem value mkItem conf@MenuItemConfig {..} rest -> do
-        evtEl <- dyn $ elDynAttr' elType attrs <$> mkItem
-        let clickEvt = domEvent Click . fst <$> evtEl
-        clickEvt' <- switchPromptly never clickEvt
+      MenuItem value label conf@MenuItemConfig {..} rest -> do
+        clickEvt <- fmap (domEvent Click . fst) $ elDynAttr' elType attrs $ do
+            maybe blank ui_ _icon
+            text label
+            maybe blank ui_ _label
         (evts, hlist) <- go inDropdown rest
-        return ((value <$ clickEvt') : evts, hlist)
+        return ((value <$ clickEvt) : evts, hlist)
           where
             (elType, attrs') = itemElAttrs conf { _link = reLink }
             reLink = case _link of
@@ -252,32 +247,11 @@ renderItems allItems currentValue = go False allItems
       MenuWidget_ mb conf rest -> elAttr elType attrs mb >> go inDropdown rest
         where (elType, attrs) = itemElAttrs conf
 
-  --  UIContent :: (Return t m b ~ rb, UI t m b) => b -> MenuItemConfig -> MenuItems t m a xs -> MenuItems t m a (rb ': xs)
-      UIContent uiElem conf rest -> do
-        b <- elAttr elType attrs $ part uiElem
-        (restEvents, restList) <- go inDropdown rest
-        return (restEvents, b `HCons` restList)
-          where (elType, attrs) = itemElAttrs conf
-
-      UIContent_ uiElem conf rest -> do
-        elAttr elType attrs $ part_ uiElem
-        go inDropdown rest
-          where (elType, attrs) = itemElAttrs conf
-
-      UIItemContent uiElem rest -> do
-        b <- ui uiElem
-        (restEvents, restList) <- go inDropdown rest
-        return (restEvents, b `HCons` restList)
-
-      UIItemContent_ uiElem rest -> do
-        ui_ $ toItem uiElem
-        go inDropdown rest
-
       DropdownMenu label items rest -> do
-        dynVal <- ui $ Dropdown items $ (pure Nothing)
+        dynVal <- ui $ Dropdown items $ (def :: DropdownConfig t (Maybe a))
           { _item = True
-          , _setValue = updatedValue
-          , _action = Select
+          -- DropdownMenu does not show the state in the dropdown
+          , _action = Hide
           , _placeholder = label
           }
         (restEvents, restList) <- go inDropdown rest
@@ -291,9 +265,8 @@ renderItems allItems currentValue = go False allItems
         return (restEvents ++ subEvents, subList `hlistAppend` restList)
           where classes = pure "menu" -- : menuConfigClasses config
 
-      MenuSub config sub rest -> do
-        (subEvents, subList) <- divClass (T.unwords classes) $ go inDropdown sub
+      RightMenu sub rest -> do
+        (subEvents, subList) <- divClass "right menu" $ go inDropdown sub
         (restEvents, restList) <- go inDropdown rest
         return (restEvents ++ subEvents, subList `hlistAppend` restList)
-          where classes = "menu" : menuConfigClasses config
 
